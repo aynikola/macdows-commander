@@ -96,3 +96,7 @@ The tests against live servers are skipped unless `MC_TEST_DIR` is set. See `scr
 [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) for the terminal and [libwebp](https://github.com/SDWebImage/libwebp-Xcode) for saving WebP.
 
 The screenshots use a sample folder and made-up servers.
+
+## License
+
+[MIT](LICENSE)

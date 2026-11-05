@@ -96,3 +96,7 @@ swift test
 Terminal için [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm), WebP kaydetmek için [libwebp](https://github.com/SDWebImage/libwebp-Xcode).
 
 Ekran görüntülerinde örnek bir klasör ve uydurma sunucular kullanıldı.
+
+## Lisans
+
+[MIT](LICENSE)
