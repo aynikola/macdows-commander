@@ -72,6 +72,15 @@ Default dark, Light, Cream and Windows Commander, from the View menu, with a cho
 
 Press `⌥F1` in the app for every shortcut and the manual, in English or Turkish.
 
+## Download
+
+Get the zip from [Releases](https://github.com/aynikola/macdows-commander/releases/latest), unzip it and move **Macdows Commander** to Applications. It runs on Apple Silicon and Intel Macs with macOS 13 or newer.
+
+The app isn't signed by an Apple developer account yet, so macOS asks once before opening it:
+
+- **macOS 14 and earlier:** right-click the app, choose **Open**, then **Open** again.
+- **macOS 15:** try to open it, close the warning, then click **Open Anyway** at the bottom of **System Settings → Privacy & Security**.
+
 ## Build
 
 Needs macOS 13 or newer and the Swift toolchain.
@@ -80,6 +89,8 @@ Needs macOS 13 or newer and the Swift toolchain.
 scripts/build-app.sh
 open "build/Macdows Commander.app"
 ```
+
+`scripts/package.sh` builds the app and zips it into `build/` for sharing.
 
 If F keys change the brightness or volume on your Mac, press them with `Fn`, or turn on standard function keys in System Settings.
 

@@ -72,6 +72,15 @@ Görünüm menüsünden Varsayılan koyu, Açık, Krem ve Windows Commander; fon
 
 Tüm kısayollar ve kılavuz için uygulamada `⌥F1`'e basın; Türkçe ve İngilizce vardır.
 
+## İndirme
+
+Zip'i [Releases](https://github.com/aynikola/macdows-commander/releases/latest) sayfasından indirin, açın ve **Macdows Commander**'ı Uygulamalar klasörüne taşıyın. macOS 13 veya üstündeki Apple Silicon ve Intel Mac'lerde çalışır.
+
+Uygulama henüz bir Apple geliştirici hesabıyla imzalı değil, bu yüzden macOS ilk açılışta bir kez sorar:
+
+- **macOS 14 ve öncesi:** Uygulamaya sağ tıklayıp **Aç** deyin, sonra yine **Aç**'a basın.
+- **macOS 15:** Açmayı deneyin, uyarıyı kapatın, sonra **Sistem Ayarları → Gizlilik ve Güvenlik**'in en altındaki **Yine de Aç**'a basın.
+
 ## Derleme
 
 macOS 13 veya üstü ve Swift araçları gerekir.
@@ -80,6 +89,8 @@ macOS 13 veya üstü ve Swift araçları gerekir.
 scripts/build-app.sh
 open "build/Macdows Commander.app"
 ```
+
+`scripts/package.sh` uygulamayı derleyip paylaşmak için `build/` içine zip'ler.
 
 F tuşları Mac'inizde parlaklık veya sesi değiştiriyorsa `Fn` ile basın ya da Sistem Ayarları'ndan standart işlev tuşlarını açın.
 
