@@ -1,0 +1,130 @@
+# Kısayollar
+
+Mac klavyede F tuşları parlaklık ve ses gibi işler yapıyorsa Fn ile birlikte basın. Sistem Ayarları > Klavye bölümünden F tuşlarını varsayılan yapabilirsiniz.
+
+## Paneller
+Tab | Diğer panele geç
+Sol / Sağ ok | Sol veya sağ paneli etkinleştir
+Yukarı / Aşağı ok | İmleci taşı
+Home / End | Listenin başına / sonuna git
+Page Up / Page Down | Bir sayfa yukarı / aşağı
+Harf veya rakam | O harfle başlayan sonraki dosyaya git; aynı harfe yeniden basınca bir sonrakine geçer
+Hızlıca birkaç harf | Adı bu harflerle başlayan dosyaya git
+Enter | Klasöre veya arşive gir; dosyayı sorup ilişkili programla aç
+Shift+Enter | Arşivin içine girmeden ilişkili programla açmayı sor
+Backspace | Üst klasöre çık
+Ins, Boşluk, sağ tık | Dosyayı işaretle / işareti kaldır
+
+## F tuşları
+F1 | Favori klasörler
+F2 | Klasör boyutu ve bilgi
+F3 | Hızlı önizleme
+F4 | Editörde aç
+Shift+F4 | F4 için başka editör seç
+F5 | Diğer panele kopyala veya gönder
+F6 | Diğer panele taşı
+Shift+F6 | Yeniden adlandır
+F7 | Yeni klasör
+F8 veya Delete (⌦) | Sil
+F9 | Alttaki terminal, bu klasörde
+F10 | Yazı editörü: bu HTML dosyası veya yeni belge
+Shift+F9 | Ayrı Terminal penceresi
+
+## Option ile
+⌥F1 | Bu pencere (⌘? de açar)
+⌥F5 | Sıkıştırıp diğer panele gönder
+⌥F7 | Dosya ve içerik araması (⌘F de açar)
+⌥F9 | Terminal için kayıtlı SSH bağlantıları
+
+## Program
+⌘K | Sunucu listesi ve bağlanma
+⌘N | Yeni pencere
+⌘W | Pencereyi kapat
+⌘R | Panelleri yenile
+⌘J | Terminal bölmesini aç / kapat
+Ctrl+Tab | Terminal ve paneller arasında geç
+⌘⇧. | Gizli dosyaları göster / gizle
+⌘⇧A | Sahip ve izinleri göster / gizle
+⌘+ / ⌘- / ⌘0 | Yazıyı büyüt / küçült / varsayılan boyut
+⌘Q | Çık
+
+## Dosya zaten varsa
+O | Üzerine yaz
+A | Tümünün üzerine yaz
+S | Atla
+K | Tümünü atla
+Esc | Aktarımı iptal et
+
+## F3 önizleme (resim)
+Sağ, Aşağı, Boşluk, Page Down | Sonraki resim
+Sol, Yukarı, Page Up | Önceki resim
+Home / End | İlk / son resim
++ / - / 0 | Yakınlaştır / uzaklaştır / sığdır
+F4 | Editörde aç
+Esc veya F3 | Kapat
+
+## Editör
+⌃S veya ⌘S | Kaydet
+⌃F veya ⌘F | Bul
+⌃H veya ⌘⌥F | Değiştir
+⌃G | Satıra git (120 veya 120:5)
+Enter, F3 veya ⌘G | Sonraki sonuç
+Shift+Enter, Shift+F3 veya ⌘⇧G | Önceki sonuç
+⌃D veya ⌘D | Satırı çoğalt
+⌃L veya ⌘L | Satırı sil
+⌃Z veya ⌘Z | Geri al
+⌃⇧Z veya ⌘⇧Z | Yinele
+Esc | Bul çubuğunu kapat; o kapalıysa editörü kapat
+
+# Kullanım kılavuzu
+
+## Sunucuya bağlanma
+⌘K ile sunucu listesini açın veya panelin üstündeki Bağlan düğmesine basın. FTP, FTPS ve SSH sunucuları kaydedebilirsiniz. Parolalar Mac'in Anahtar Zinciri'nde saklanır.
+FTP'de Otomatik modu önce passive dener, olmazsa active moda geçer; çoğu zaman ayarlamanız gerekmez.
+FTP olmayan makineler için SSH seçin. Program SFTP kullanır, SFTP kapalıysa kendiliğinden SCP'ye geçer. SSH anahtarınızı kullanmak için parolayı boş bırakın.
+
+## Dosya gönderme
+Dosyaları Ins, Boşluk veya sağ tık ile işaretleyin, F5'e basın. Hiçbir şey işaretli değilse imlecin üstündeki dosya gider. Hedefte aynı adlı dosya varsa sormadan üstüne yazılmaz.
+Aktarımlar arka planda sıraya girer ve ilerlemesi alttaki listede görünür.
+
+## Editör
+F4 yerleşik editörü açar. HTML, JavaScript, PHP ve CSS renkli görünür. Dosyanın kodlaması ve satır sonları kaydederken korunur.
+Sunucudaki dosya kaydedilince sunucuya yüklenir. Dosya siz açtıktan sonra başkası tarafından değiştirildiyse üzerine yazmadan önce sorulur.
+Başka bir program kullanmak için Shift+F4 ile editör seçin.
+
+## Hata denetimi
+JavaScript ve PHP hataları siz yazmayı bırakınca denetlenir. Kod çalıştırılmaz. Hatalı satır kırmızı işaretlenir, alttaki mesaja tıklayınca o satıra gidilir.
+PHP denetimi için bu Mac'te PHP gerekir; önce MAMP'taki en yeni sürüm kullanılır. Her dosya veya script bloğu için yalnızca ilk hata görünür. İçinde PHP olan script blokları denetlenmez.
+
+## Arşivler
+Enter ile zip, tar, tar.gz, tgz, tbz, txz veya gz dosyasının içine girilir. İçeride F3 ile bakabilir, F5 ile dışarı kopyalayabilirsiniz. Arşivler salt okunurdur; .. ile çıkılır.
+⌥F5 seçili dosyaları sıkıştırıp diğer panele gönderir. Biçim ve adı sorar. Gz yalnızca tek dosya içindir; klasörler için tar.gz seçin.
+
+## Arama
+⌥F7 etkin klasörün altında arar. Ada göre aramada *.php;*.html veya adın bir parçası yazılır. İçerik aramasında satır numarası ve satır gösterilir.
+İkili dosyaların içine bakılmaz. Sunucuda içerik araması her dosyayı indirir, bu yüzden yavaştır ve 20 MB üstü dosyaları atlar.
+
+## Favoriler
+Üstteki yıldız etkin klasörü favorilere ekler veya çıkarır. F1 listeyi açar, 1-9 ile seçilir.
+
+## SSH bağlantıları
+⌥F9 veya SSH düğmesi kayıtlı SSH sunucularını listeler; 1-9 ile seçilir. Alttaki terminalde açılır ve F9'a basana kadar orada kalır. Tik işareti o bağlantının açık olduğunu gösterir.
+Sunucu listesinde (⌘K) SSH seçip girişi ayarlayın:
+Parola | Parola alanına yazın.
+.pem anahtar | Anahtar dosyası alanından seçin. Başkaları okuyabiliyorsa izni 600 yapılır, yoksa ssh kabul etmez. Anahtarın parolası parola alanına yazılır.
+Başka sunucu üzerinden | Önce o sunucuyu kaydedin, sonra Şunun üzerinden alanından seçin. Her sunucunun parolası veya anahtarı ayrıdır. Yalnızca belirli adreslere açık makineler için kullanın. Dosya aktarımında da geçerlidir.
+Parolayı boş bırakırsanız terminal sorar; tek kullanımlık kodlar için de bu uygundur.
+
+## Yazı editörü
+F10 imlecin üstündeki HTML dosyasını okunacağı haliyle açar, başka yerdeyseniz Balmy stilinde yeni belge başlatır. Doğrudan sayfanın üstüne yazarsınız; üstteki düğmeler başlık, liste, tablo ve renkli kutu ekler.
+⌘B ⌘I ⌘U | Kalın, italik, altı çizili
+⌘1 ⌘2 ⌘3 ⌘0 | Başlık 1, 2, 3, düz paragraf
+⌘K | Bağlantı
+⌘S | Kaydet
+Yalnızca sayfanın içeriği değişir, çevresi olduğu gibi kalır; içeriğin HTML'i kaydederken biraz düzenlenebilir. Yapıştırılan metnin yapısı kalır, stili atılır. Sayfadaki betikler çalışmaz. İçinde PHP olan dosyalar F4 ile açılır.
+
+## Terminal
+F9 alttaki terminali etkin klasörde açar. Panel bir SSH sunucusundaysa terminal o sunucuya bağlanır. FTP'de kabuk olmadığı için terminal açılmaz.
+
+## Görünüm
+⌘+ ve ⌘- yazı boyutunu değiştirir. Font, Görünüm > Font menüsünden seçilir. Krem, koyu, ilk renkler veya sisteme uyan tema, Görünüm > Tema menüsünden seçilir. Dil, Dil menüsünden değiştirilir.

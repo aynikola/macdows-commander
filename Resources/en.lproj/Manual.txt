@@ -1,0 +1,130 @@
+# Shortcuts
+
+If F keys on your Mac change brightness or volume, press them with Fn. System Settings > Keyboard can make them standard function keys.
+
+## Panels
+Tab | Switch to the other panel
+Left / Right arrow | Activate the left or right panel
+Up / Down arrow | Move the cursor
+Home / End | Go to the start / end of the list
+Page Up / Page Down | One page up / down
+Letter or digit | Next file starting with it; the same letter again moves to the one after
+Several letters, quickly | File whose name starts with those letters
+Enter | Enter a folder or archive; open a file with its app after asking
+Shift+Enter | Offer the associated app instead of looking inside an archive
+Backspace | Go to the parent folder
+Ins, Space, right click | Mark / unmark a file
+
+## F keys
+F1 | Favorite folders
+F2 | Folder size and info
+F3 | Quick preview
+F4 | Open in the editor
+Shift+F4 | Choose another editor for F4
+F5 | Copy or send to the other panel
+F6 | Move to the other panel
+Shift+F6 | Rename
+F7 | New folder
+F8 or Delete (⌦) | Delete
+F9 | Bottom terminal, in this folder
+F10 | Writing editor: this HTML file, or a new document
+Shift+F9 | Separate Terminal window
+
+## With Option
+⌥F1 | This window (⌘? too)
+⌥F5 | Compress and send to the other panel
+⌥F7 | Search files and contents (⌘F too)
+⌥F9 | Saved SSH connections for the terminal
+
+## Program
+⌘K | Server list and connecting
+⌘N | New window
+⌘W | Close the window
+⌘R | Refresh the panels
+⌘J | Show / hide the terminal pane
+Ctrl+Tab | Move between the terminal and the panels
+⌘⇧. | Show / hide hidden files
+⌘⇧A | Show / hide owner and permissions
+⌘+ / ⌘- / ⌘0 | Bigger / smaller / default text size
+⌘Q | Quit
+
+## When a file already exists
+O | Overwrite
+A | Overwrite all
+S | Skip
+K | Skip all
+Esc | Cancel the transfer
+
+## F3 preview (images)
+Right, Down, Space, Page Down | Next image
+Left, Up, Page Up | Previous image
+Home / End | First / last image
++ / - / 0 | Zoom in / out / fit
+F4 | Open in the editor
+Esc or F3 | Close
+
+## Editor
+⌃S or ⌘S | Save
+⌃F or ⌘F | Find
+⌃H or ⌘⌥F | Replace
+⌃G | Go to line (120 or 120:5)
+Enter, F3 or ⌘G | Next match
+Shift+Enter, Shift+F3 or ⌘⇧G | Previous match
+⌃D or ⌘D | Duplicate line
+⌃L or ⌘L | Delete line
+⌃Z or ⌘Z | Undo
+⌃⇧Z or ⌘⇧Z | Redo
+Esc | Close the find bar, or the editor when it's closed
+
+# User manual
+
+## Connecting to a server
+Press ⌘K or the Connect button above a panel to open the server list. You can save FTP, FTPS and SSH servers. Passwords are kept in the Mac's Keychain.
+FTP's Automatic mode tries passive first and moves to active if that fails, so it rarely needs changing.
+For machines without FTP, choose SSH. The program uses SFTP and moves to SCP by itself when SFTP is off. Leave the password empty to use your SSH keys.
+
+## Sending files
+Mark files with Ins, Space or right click, then press F5. With nothing marked, the file under the cursor goes. A file with the same name at the target is never overwritten without asking.
+Transfers queue in the background and show their progress in the list at the bottom.
+
+## Editor
+F4 opens the built-in editor. HTML, JavaScript, PHP and CSS are colored. Saving keeps the file's encoding and line endings.
+A file on a server is uploaded when you save. If someone else changed it after you opened it, you're asked before it's overwritten.
+Press Shift+F4 to choose another program.
+
+## Error checking
+JavaScript and PHP are checked when you pause typing. Code is never run. A line with an error turns red, and clicking the message at the bottom goes to it.
+PHP checking needs PHP on this Mac; MAMP's newest version is tried first. Only the first error of each file or script block shows. Script blocks with PHP inside are not checked.
+
+## Archives
+Enter opens zip, tar, tar.gz, tgz, tbz, txz and gz files. Inside, F3 previews and F5 copies out. Archives are read-only, and .. leaves them.
+⌥F5 compresses the selected files and sends them to the other panel, asking for the format and name. Gz is for a single file; use tar.gz for folders.
+
+## Search
+⌥F7 searches below the active folder. By name, type *.php;*.html or part of a name. Content search shows the line number and the line.
+Binary files are not read. On a server, content search downloads each file, so it's slow and skips files over 20 MB.
+
+## Favorites
+The star at the top adds or removes the active folder. F1 opens the list, and 1-9 choose from it.
+
+## SSH connections
+⌥F9 or the SSH button lists saved SSH servers; the digits 1-9 pick one. It opens in the bottom terminal and stays there until F9. A check mark means that connection is running.
+In the server list (⌘K), choose SSH and set the login:
+Password | Type it in the password field.
+.pem key | Choose it under Key file. Its permissions are set to 600 if others can read it, because ssh refuses it otherwise. A key's passphrase goes in the password field.
+Through another server | First save that server, then pick it under Connect through. Each server keeps its own password or key. Use this for machines that only accept certain addresses. It also applies to file transfers.
+Leave the password empty and the terminal asks for it, which also suits one-time codes.
+
+## Writing editor
+F10 opens the HTML file under the cursor as you'd read it, or starts a new document in the Balmy style. Write directly on the page; the buttons at the top add headings, lists, tables and colored boxes.
+⌘B ⌘I ⌘U | Bold, italic, underline
+⌘1 ⌘2 ⌘3 ⌘0 | Heading 1, 2, 3, plain paragraph
+⌘K | Link
+⌘S | Save
+Only the page's content changes. Everything around it stays as it was, though the content's HTML may be tidied on save. Pasted text keeps its structure and drops its styling. Scripts in the page don't run. Files with PHP stay with F4.
+
+## Terminal
+F9 opens the bottom terminal in the active folder. When the panel is on an SSH server, the terminal connects to that server. FTP has no shell, so no terminal opens there.
+
+## Appearance
+⌘+ and ⌘- change the text size. View > Font chooses the typeface. View > Theme chooses cream, dark, the original colors or the system setting. The Language menu changes the language.
