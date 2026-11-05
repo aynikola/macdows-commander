@@ -16,6 +16,11 @@ Backspace | Go to the parent folder
 Ins, Space, right click | Mark / unmark a file
 Shift+click | Mark from the cursor to the clicked row
 Ctrl+Q | Folder size and info
+Drag from Finder | Dropping on a panel copies, on a folder row copies into it, with ⌘ moves
+⌘1 or Ctrl+1 | Sort by name; again reverses it
+⌘2 or Ctrl+2 | Sort by size, largest first
+⌘3 or Ctrl+3 | Sort by date, newest first
+⌘L | Path box at the bottom: paste a path, Enter goes, Esc cancels
 Ctrl+A or ⌘A | Mark everything; again to clear the marks
 
 ## F keys

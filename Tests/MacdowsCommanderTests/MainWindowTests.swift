@@ -273,6 +273,103 @@ final class MainWindowTests: XCTestCase {
         XCTAssertTrue(panel.marked.isEmpty, "again clears them")
     }
 
+    func testDroppedFilesAreCopiedInAndFoldersTakeThemToo() throws {
+        let outside = root.appendingPathComponent("finder")
+        let folder = root.appendingPathComponent("klasor")
+        for url in [outside, folder] { try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true) }
+        let dropped = outside.appendingPathComponent("birakilan.txt")
+        try "icerik".write(to: dropped, atomically: true, encoding: .utf8)
+        var done = false
+        controller.left.load(path: root.path, select: nil) { _ in done = true }
+        spin("loaded") { done }
+
+        controller.dropFiles([dropped], into: controller.left, folder: nil, move: false)
+        let copied = root.appendingPathComponent("birakilan.txt")
+        spin("copied") { FileManager.default.fileExists(atPath: copied.path) }
+        XCTAssertEqual(try String(contentsOf: copied, encoding: .utf8), "icerik")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: dropped.path), "a plain drop copies")
+
+        controller.dropFiles([dropped], into: controller.left, folder: folder.path, move: true)
+        let moved = folder.appendingPathComponent("birakilan.txt")
+        spin("moved") { FileManager.default.fileExists(atPath: moved.path) && !FileManager.default.fileExists(atPath: dropped.path) }
+
+        spin("list refreshed") { controller.left.rows.contains { $0.name == "birakilan.txt" } }
+        let row = try XCTUnwrap(controller.left.rows.firstIndex { $0.name == "klasor" })
+        XCTAssertEqual(controller.left.dropFolder(row: row, operation: .on), folder.path)
+        XCTAssertNil(controller.left.dropFolder(row: row, operation: .above))
+        let writer = controller.left.tableView(controller.left.table, pasteboardWriterForRow: row) as? NSURL
+        XCTAssertEqual(writer?.path, folder.path)
+        let parent = try XCTUnwrap(controller.left.rows.firstIndex { $0.name == ".." })
+        XCTAssertNil(controller.left.tableView(controller.left.table, pasteboardWriterForRow: parent), "a parent row can't be dragged")
+    }
+
+    func testGoToOpensAFolderOrAFilesFolderWithTheFileSelected() throws {
+        let deep = root.appendingPathComponent("a b/c")
+        try FileManager.default.createDirectory(at: deep, withIntermediateDirectories: true)
+        let file = deep.appendingPathComponent("yazi.txt")
+        try "x".write(to: file, atomically: true, encoding: .utf8)
+        let panel = controller.left
+        controller.goTo("  \"\(deep.path)/\"  ", in: panel)
+        spin("folder") { panel.path == deep.path }
+        controller.goTo(root.path, in: panel)
+        spin("back") { panel.path == root.path }
+        controller.goTo(file.path, in: panel)
+        spin("file's folder") { panel.path == deep.path && panel.cursorEntry?.name == "yazi.txt" }
+        controller.goTo(root.path, in: panel)
+        spin("back again") { panel.path == root.path }
+        controller.goTo("a b/c", in: panel)
+        spin("relative") { panel.path == deep.path }
+    }
+
+    func testPathBoxFollowsTheActivePanelAndEnterGoesThere() throws {
+        let deep = root.appendingPathComponent("yol/ic")
+        try FileManager.default.createDirectory(at: deep, withIntermediateDirectories: true)
+        controller.activate(controller.left)
+        var done = false
+        controller.left.load(path: root.path, select: nil) { _ in done = true }
+        spin("loaded") { done }
+        XCTAssertEqual(controller.pathField.stringValue, root.path)
+        controller.pathField.stringValue = deep.path
+        XCTAssertTrue(controller.control(controller.pathField, textView: NSTextView(), doCommandBy: #selector(NSResponder.insertNewline(_:))))
+        spin("went there") { controller.left.path == deep.path }
+        spin("box updated") { controller.pathField.stringValue == deep.path }
+        controller.pathField.stringValue = "/yanlis"
+        XCTAssertTrue(controller.control(controller.pathField, textView: NSTextView(), doCommandBy: #selector(NSResponder.cancelOperation(_:))))
+        XCTAssertEqual(controller.pathField.stringValue, deep.path, "Esc puts the path back")
+        XCTAssertEqual(controller.left.path, deep.path)
+    }
+
+    func testSortKeysOrderTheListAndReverseIt() throws {
+        let panel = controller.left
+        let folder = root.appendingPathComponent("sira")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try "kucuk".write(to: folder.appendingPathComponent("b.txt"), atomically: true, encoding: .utf8)
+        try String(repeating: "x", count: 500).write(to: folder.appendingPathComponent("c.txt"), atomically: true, encoding: .utf8)
+        try "orta metin".write(to: folder.appendingPathComponent("a.txt"), atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1000)], ofItemAtPath: folder.appendingPathComponent("c.txt").path)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 3000)], ofItemAtPath: folder.appendingPathComponent("a.txt").path)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 2000)], ofItemAtPath: folder.appendingPathComponent("b.txt").path)
+        var done = false
+        panel.load(path: folder.path, select: nil) { _ in done = true }
+        spin("loaded") { done }
+        func files() -> [String] { panel.rows.map(\.name).filter { $0 != ".." } }
+        func press(_ key: String) {
+            let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .control, timestamp: 0, windowNumber: controller.window!.windowNumber, context: nil, characters: key, charactersIgnoringModifiers: key, isARepeat: false, keyCode: 18)!
+            panel.table.keyDown(with: event)
+        }
+        XCTAssertEqual(files(), ["a.txt", "b.txt", "c.txt"])
+        press("2")
+        XCTAssertEqual(files(), ["c.txt", "a.txt", "b.txt"], "largest first")
+        press("3")
+        XCTAssertEqual(files(), ["a.txt", "b.txt", "c.txt"], "newest first")
+        press("3")
+        XCTAssertEqual(files(), ["c.txt", "b.txt", "a.txt"], "again reverses")
+        press("1")
+        XCTAssertEqual(files(), ["a.txt", "b.txt", "c.txt"])
+        press("1")
+        XCTAssertEqual(files(), ["c.txt", "b.txt", "a.txt"])
+    }
+
     func testGitButtonsAreListedAndChangesWaitForEnter() {
         let commands = Dictionary(uniqueKeysWithValues: TerminalPane.gitCommands.map { ($0.title, $0) })
         for title in ["status", "diff", "log", "branch"] { XCTAssertEqual(commands[title]?.run, true, title) }

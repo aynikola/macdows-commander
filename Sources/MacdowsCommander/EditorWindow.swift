@@ -29,16 +29,16 @@ private enum EditorColors {
     /// Readable on the background of each theme.
     static func color(for kind: TokenKind) -> NSColor {
         switch kind {
-        case .comment: return Theme.token(0x7A8450, dark: 0x7FA86F, norton: 0x8FD0FF)
-        case .string: return Theme.token(0xA8552C, dark: 0xE5A07B, norton: 0xFFFF55)
-        case .keyword: return Theme.token(0x9A3E8C, dark: 0xD197D9, norton: 0xFF9FFF)
-        case .number: return Theme.token(0x2F7D4F, dark: 0xB9DDA5, norton: 0x55FF55)
-        case .tag: return Theme.token(0x2B6CA3, dark: 0x6DB3F2, norton: 0x55FFFF)
-        case .attribute: return Theme.token(0x8A5A12, dark: 0x9CDCFE, norton: 0xFFD27F)
-        case .variable: return Theme.token(0x12788A, dark: 0x7FD6F0, norton: 0x9FFFB0)
-        case .function: return Theme.token(0x6A4FB0, dark: 0xE6DFA0, norton: 0xFFFFAA)
-        case .meta: return Theme.token(0xC6613F, dark: 0xFF8F8F, norton: 0xFF7F7F)
-        case .regex: return Theme.token(0xB5305F, dark: 0xF08FA8, norton: 0xFFAAD0)
+        case .comment: return Theme.token(0x7A8450, dark: 0x7FA86F)
+        case .string: return Theme.token(0xA8552C, dark: 0xE5A07B)
+        case .keyword: return Theme.token(0x9A3E8C, dark: 0xD197D9)
+        case .number: return Theme.token(0x2F7D4F, dark: 0xB9DDA5)
+        case .tag: return Theme.token(0x2B6CA3, dark: 0x6DB3F2)
+        case .attribute: return Theme.token(0x8A5A12, dark: 0x9CDCFE)
+        case .variable: return Theme.token(0x12788A, dark: 0x7FD6F0)
+        case .function: return Theme.token(0x6A4FB0, dark: 0xE6DFA0)
+        case .meta: return Theme.token(0xC6613F, dark: 0xFF8F8F)
+        case .regex: return Theme.token(0xB5305F, dark: 0xF08FA8)
         }
     }
 }

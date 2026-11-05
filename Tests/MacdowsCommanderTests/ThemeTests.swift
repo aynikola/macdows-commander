@@ -38,14 +38,17 @@ final class ThemeTests: XCTestCase {
         XCTAssertGreaterThan(components(Theme.background)[0], 0.9)
         XCTAssertLessThan(components(Theme.text)[0], 0.15, "darker than it was")
 
-        Theme.choice = .norton
-        XCTAssertEqual(NSApp.appearance?.name, .darkAqua)
-        XCTAssertEqual(components(Theme.background)[2], 170.0 / 255, accuracy: 0.01)
+        Theme.choice = .windowsCommander
+        XCTAssertEqual(NSApp.appearance?.name, .aqua)
+        XCTAssertEqual(components(Theme.background), [1, 1, 1])
+        XCTAssertEqual(components(Theme.text), [0, 0, 0])
+        XCTAssertEqual(components(Theme.accent)[2], 128.0 / 255, accuracy: 0.01, "the navy title bar")
+        XCTAssertEqual(components(Theme.chrome)[0], 212.0 / 255, accuracy: 0.01, "the grey window parts")
         XCTAssertEqual(components(Theme.terminalBackground), [0, 0, 0])
     }
 
     func testThemeListIsTheFourAskedFor() {
-        XCTAssertEqual(Theme.Choice.allCases, [.defaultDark, .light, .cream, .norton])
+        XCTAssertEqual(Theme.Choice.allCases, [.defaultDark, .light, .cream, .windowsCommander])
     }
 
     func testEveryThemeKeepsTextReadable() {

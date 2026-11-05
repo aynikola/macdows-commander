@@ -401,7 +401,7 @@
 "menu.theme.defaultDark" = "Default dark";
 "menu.theme.light" = "Light";
 "menu.theme.cream" = "Cream";
-"menu.theme.norton" = "Norton / Windows Commander";
+"menu.theme.windowsCommander" = "Windows Commander";
 "terminal.hints" = "Tips: Tab completes · Up arrow: last command · Ctrl+R: search history\nCtrl+C: stop · Ctrl+L: clear · F9: go to the panel folder\nThe Git buttons type the command; add, commit, pull, push and switch wait for Enter.";
 "terminal.gitWaits" = "runs when you press Enter";
 "rich.source" = "Source ⌘⇧K";
@@ -410,3 +410,11 @@
 "conflict.renameTitle" = "New name for the copy";
 
 "key.same" = "Open same";
+
+"goTo.notFound" = "%@ was not found.";
+
+"path.hint" = "Paste a path and press Enter (⌘L)";
+"menu.sortName" = "Sort by Name";
+"menu.sortSize" = "Sort by Size";
+"menu.sortDate" = "Sort by Date";
+"menu.pathBox" = "Go to Path Box";

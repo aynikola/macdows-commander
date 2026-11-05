@@ -25,6 +25,8 @@ public struct TransferPlan {
     public var sourceDirectories: [String] = []
     public var skipped: Set<String> = []
 
+    public init() {}
+
     /// Sends one file to a new name in the same folder, leaving what is already there alone.
     public mutating func rename(relative: String, to name: String) {
         guard let index = files.firstIndex(where: { $0.relative == relative }) else { return }

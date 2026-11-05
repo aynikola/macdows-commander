@@ -2,7 +2,7 @@ import AppKit
 import UniformTypeIdentifiers
 import MacdowsCore
 
-final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuItemValidation {
+final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWindowDelegate, NSMenuItemValidation {
     var onClose: (() -> Void)?
 
     let left: PanelController
@@ -32,6 +32,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     private let newWindowButton = NSButton()
     private let searchButton = NSButton()
     private let newFileButton = NSButton()
+    let pathField = NSTextField()
+    private var dropSources: [PanelController] = []
     private let mirrorButton = NSButton()
     private let compareButton = NSButton()
     private let packButton = NSButton()
@@ -219,7 +221,14 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         terminalHeight = terminalPane.heightAnchor.constraint(equalToConstant: 0)
         terminalGap = terminalPane.topAnchor.constraint(equalTo: split.bottomAnchor, constant: 0)
 
-        [top, split, terminalPane, queue, bar, toast].forEach { content.addSubview($0) }
+        pathField.translatesAutoresizingMaskIntoConstraints = false
+        pathField.font = AppFont.mono
+        pathField.lineBreakMode = .byTruncatingHead
+        pathField.usesSingleLineMode = true
+        pathField.delegate = self
+        pathField.placeholderString = L10n.t("path.hint")
+        pathField.toolTip = L10n.t("path.hint")
+        [top, split, terminalPane, queue, pathField, bar, toast].forEach { content.addSubview($0) }
         NSLayoutConstraint.activate([
             top.topAnchor.constraint(equalTo: content.topAnchor, constant: 6),
             top.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 6),
@@ -236,7 +245,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             queue.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -10),
             queueHeader.widthAnchor.constraint(equalTo: queue.widthAnchor),
             queueStack.widthAnchor.constraint(equalTo: queue.widthAnchor),
-            bar.topAnchor.constraint(equalTo: queue.bottomAnchor, constant: 6),
+            pathField.topAnchor.constraint(equalTo: queue.bottomAnchor, constant: 6),
+            pathField.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 6),
+            pathField.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -6),
+            bar.topAnchor.constraint(equalTo: pathField.bottomAnchor, constant: 6),
             bar.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 6),
             bar.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -6),
             bar.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -8),
@@ -252,6 +264,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             return self.handleKey(event, panel: panel)
         }
         panel.onActivate = { [weak self] in self?.refreshActive() }
+        panel.onChromeChange = { [weak self] in self?.showActivePath() }
         panel.onOpen = { [weak self, weak panel] entry in
             guard let self, let panel else { return }
             if let kind = ArchiveKind.detect(entry.name) {
@@ -261,6 +274,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             }
         }
         panel.onError = { [weak self] message in self?.showError(message) }
+        panel.onDropFiles = { [weak self, weak panel] urls, folder, move in
+            guard let self, let panel else { return }
+            self.dropFiles(urls, into: panel, folder: folder, move: move)
+        }
         panel.onPathChange = { [weak self, weak panel] in
             guard let self, let panel else { return }
             self.panelPathChanged(panel)
@@ -334,6 +351,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     private func handleKey(_ event: NSEvent, panel: PanelController) -> Bool {
         let flags = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        if flags == .control, let key = event.charactersIgnoringModifiers, let order = ["1": "name", "2": "size", "3": "date"][key] {
+            panel.sort(by: order)
+            return true
+        }
         if flags == .control, event.keyCode == 12 { // Ctrl+Q
             showInfo()
             return true
@@ -607,6 +628,45 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                 self.launch(plan: next, from: from, to: to, move: move)
             default:
                 break // Nothing was transferred, the marks stay.
+            }
+        }
+    }
+
+    /// Files dragged in from Finder or the other panel. A file that exists is asked about, as with F5.
+    func dropFiles(_ urls: [URL], into panel: PanelController, folder: String?, move: Bool) {
+        let destination = folder ?? panel.path
+        let target = panel.source
+        // Dropping a file back where it already is does nothing.
+        let wanted = urls.filter { target.isRemote || $0.deletingLastPathComponent().path != URL(fileURLWithPath: destination).path }
+        guard !wanted.isEmpty else { return }
+        showToast(L10n.t("copy.scanning"))
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            do {
+                let local = LocalSource()
+                var whole = TransferPlan()
+                for (parent, group) in Dictionary(grouping: wanted, by: { $0.deletingLastPathComponent().path }) {
+                    let names = Set(group.map(\.lastPathComponent))
+                    let entries = try local.list(parent).filter { names.contains($0.name) }
+                    let part = try TransferPlanner.plan(selection: entries, from: local, sourceDirectory: parent, to: target, destinationDirectory: destination)
+                    whole.directoriesToCreate += part.directoriesToCreate
+                    whole.files += part.files
+                    whole.conflicts += part.conflicts
+                    whole.sourceDirectories += part.sourceDirectories
+                }
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    self.toast.isHidden = true
+                    // The files come from this Mac whatever the panels show, so a panel of its own stands in as the source.
+                    let from = PanelController(path: wanted[0].deletingLastPathComponent().path, showAttributes: false)
+                    self.dropSources.append(from)
+                    if whole.conflicts.isEmpty {
+                        self.launch(plan: whole, from: from, to: panel, move: move)
+                    } else {
+                        self.resolve(plan: whole, index: 0, from: from, to: panel, move: move)
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async { self?.showError(error.localizedDescription) }
             }
         }
     }
@@ -1139,6 +1199,69 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                 return .binary(L10n.t("compare.bytesDiffer", String(offset + place + 1), Format.size(Int64(sizes.0)), Format.size(Int64(sizes.1))))
             }
             offset += partA.count
+        }
+    }
+
+    // MARK: Path box
+
+    /// Keeps showing where the active panel is, except while something is being typed there.
+    func showActivePath() {
+        guard pathField.currentEditor() == nil else { return }
+        pathField.stringValue = active.path
+    }
+
+    /// ⌘L: the cursor goes to the path box with the path selected, ready to paste over.
+    @objc func focusPathField(_ sender: Any?) {
+        window?.makeFirstResponder(pathField)
+        pathField.currentEditor()?.selectAll(nil)
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        guard control === pathField else { return false }
+        let panel = active
+        if selector == #selector(NSResponder.insertNewline(_:)) {
+            let typed = pathField.stringValue
+            activate(panel)
+            goTo(typed, in: panel)
+            return true
+        }
+        if selector == #selector(NSResponder.cancelOperation(_:)) {
+            activate(panel)
+            showActivePath()
+            return true
+        }
+        return false
+    }
+
+    // MARK: Sorting
+
+    @objc func sortByName(_ sender: Any?) { active.sort(by: "name") }
+    @objc func sortBySize(_ sender: Any?) { active.sort(by: "size") }
+    @objc func sortByDate(_ sender: Any?) { active.sort(by: "date") }
+
+    /// Opens a folder in `panel`, or the folder of a file with the file selected. A relative path starts at the panel's folder.
+    func goTo(_ typed: String, in panel: PanelController) {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        guard var path = GoToPath.clean(typed, home: home) else { return }
+        if !path.hasPrefix("/") { path = PathUtil.join(panel.path, path) }
+        if panel.isInArchive { panel.leaveArchive() }
+        let source = panel.source
+        DispatchQueue.global(qos: .userInitiated).async { [weak self, weak panel] in
+            var folder = path
+            var select: String?
+            if (try? source.list(path)) == nil {
+                // Not a folder that can be listed. It may be a file, which is found through its parent.
+                let parent = PathUtil.parent(path), name = (path as NSString).lastPathComponent
+                if (try? source.list(parent))?.contains(where: { $0.name == name && !$0.isDirectory }) == true {
+                    folder = parent
+                    select = name
+                }
+            }
+            DispatchQueue.main.async {
+                panel?.load(path: folder, select: select) { error in
+                    if error != nil { self?.showError(L10n.t("goTo.notFound", path)) }
+                }
+            }
         }
     }
 

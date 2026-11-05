@@ -130,6 +130,22 @@ public enum PathUtil {
 public typealias ProgressHandler = (Int64) -> Bool
 
 /// One side of a transfer. The same operations work on the local disk and on a server.
+/// What was typed or pasted into Go to folder, as a plain path. Nil when there is nothing to go to.
+public enum GoToPath {
+    public static func clean(_ typed: String, home: String) -> String? {
+        var text = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Finder's Copy as Pathname is plain, but paths from elsewhere come quoted or as file addresses.
+        if text.count >= 2, let first = text.first, first == text.last, first == "\"" || first == "'" { text = String(text.dropFirst().dropLast()) }
+        if text.hasPrefix("file://"), let url = URL(string: text) { text = url.path }
+        text = text.replacingOccurrences(of: "\\ ", with: " ")
+        if text == "~" { return home }
+        if text.hasPrefix("~/") { text = home + text.dropFirst(1) }
+        guard text.hasPrefix("/") else { return text.isEmpty ? nil : text }
+        while text.count > 1, text.hasSuffix("/") { text.removeLast() }
+        return text
+    }
+}
+
 public protocol FileSource: AnyObject {
     var isRemote: Bool { get }
     func list(_ path: String) throws -> [FileEntry]

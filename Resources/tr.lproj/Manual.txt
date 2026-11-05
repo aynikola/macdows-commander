@@ -16,6 +16,11 @@ Backspace | Üst klasöre çık
 Ins, Boşluk, sağ tık | Dosyayı işaretle / işareti kaldır
 Shift+tık | İmleçten tıklanan satıra kadar işaretle
 Ctrl+Q | Klasör boyutu ve bilgi
+Finder'dan sürükle | Panele bırakınca kopyalar, klasör satırına bırakınca içine, ⌘ ile taşır
+⌘1 veya Ctrl+1 | Ada göre sırala; yine basınca ters çevir
+⌘2 veya Ctrl+2 | Boyuta göre sırala, önce en büyük
+⌘3 veya Ctrl+3 | Tarihe göre sırala, önce en yeni
+⌘L | En alttaki yol kutusu: yolu yapıştırıp Enter ile gidin, Esc vazgeçer
 Ctrl+A veya ⌘A | Hepsini işaretle; yine basınca işaretleri kaldır
 
 ## F tuşları

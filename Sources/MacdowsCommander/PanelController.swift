@@ -94,6 +94,7 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
     let view = NSView()
     let siteButton = NSButton()
     var onActivate: (() -> Void)?
+    var onChromeChange: (() -> Void)?
     var onOpen: ((FileEntry) -> Void)?
     var onError: ((String) -> Void)?
     var onPathChange: (() -> Void)?
@@ -204,6 +205,9 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         table.allowsEmptySelection = false
         table.allowsColumnReordering = false
         table.dataSource = self
+        table.registerForDraggedTypes([.fileURL])
+        table.setDraggingSourceOperationMask([.copy, .move], forLocal: true)
+        table.setDraggingSourceOperationMask([.copy], forLocal: false)
         table.delegate = self
         table.target = self
         table.doubleAction = #selector(doubleClicked)
@@ -233,7 +237,7 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
         scroll.drawsBackground = false
-        table.backgroundColor = .clear
+        table.backgroundColor = Theme.background
         table.selectionHighlightStyle = .none
         scroll.contentView.postsFrameChangedNotifications = true
         NotificationCenter.default.addObserver(self, selector: #selector(fontChanged), name: .appFontChanged, object: nil)
@@ -348,6 +352,8 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
 
     @objc private func themeChanged() {
         refreshChrome()
+        table.backgroundColor = Theme.background
+        table.reloadData()
         table.needsDisplay = true
         table.headerView?.needsDisplay = true
     }
@@ -374,6 +380,7 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
 
     /// Colors that say which panel keys go to.
     func refreshChrome() {
+        onChromeChange?()
         let active = isActive
         table.isActivePanel = active
         view.layer?.borderColor = Theme.resolved(active ? Theme.accent : Theme.border).cgColor
@@ -516,7 +523,7 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
             status.textColor = .secondaryLabelColor
             status.stringValue = L10n.t("status.items", String(real.count), Format.size(size(real)))
         } else {
-            status.textColor = .systemOrange
+            status.textColor = Theme.warning
             status.stringValue = L10n.t("status.marked", String(picked.count), String(real.count), Format.size(size(picked)))
         }
     }
@@ -629,6 +636,36 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
 
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
 
+    // MARK: Dragging
+
+    /// Files dropped here, the folder row they landed on if any, and whether they should move.
+    var onDropFiles: (([URL], String?, Bool) -> Void)?
+
+    /// Only a file on this Mac can be handed to Finder as it is.
+    func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
+        guard !source.isRemote, !isInArchive, row >= 0, row < rows.count, rows[row].name != ".." else { return nil }
+        return URL(fileURLWithPath: PathUtil.join(path, rows[row].name)) as NSURL
+    }
+
+    /// The folder files dragged to `row` go into: that row if it is a folder, otherwise the panel's own.
+    func dropFolder(row: Int, operation: NSTableView.DropOperation) -> String? {
+        guard operation == .on, row >= 0, row < rows.count, rows[row].isDirectory, rows[row].name != ".." else { return nil }
+        return PathUtil.join(path, rows[row].name)
+    }
+
+    func tableView(_ tableView: NSTableView, validateDrop info: NSDraggingInfo, proposedRow row: Int, proposedDropOperation operation: NSTableView.DropOperation) -> NSDragOperation {
+        guard !isInArchive else { return [] }
+        if dropFolder(row: row, operation: operation) == nil { tableView.setDropRow(-1, dropOperation: .on) }
+        return info.draggingSourceOperationMask == .move ? .move : .copy
+    }
+
+    func tableView(_ tableView: NSTableView, acceptDrop info: NSDraggingInfo, row: Int, dropOperation: NSTableView.DropOperation) -> Bool {
+        let urls = info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+        guard !urls.isEmpty else { return false }
+        onDropFiles?(urls, dropFolder(row: row, operation: dropOperation), info.draggingSourceOperationMask == .move)
+        return true
+    }
+
     private func icon(for entry: FileEntry) -> NSImage {
         let image: NSImage
         if entry.isDirectory {
@@ -674,6 +711,12 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         if tableColumn?.identifier.rawValue == Column.name.rawValue {
             text.font = AppFont.list(bold: isMarked)
         }
+    }
+
+    /// Names start A to Z; sizes and dates start with the largest and newest. The same key again reverses it.
+    func sort(by key: String) {
+        let ascending = key == sortKey ? !self.ascending : key == "name"
+        table.sortDescriptors = [NSSortDescriptor(key: key, ascending: ascending)]
     }
 
     func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {

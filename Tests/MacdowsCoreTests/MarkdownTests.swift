@@ -107,6 +107,22 @@ final class FrontMatterTests: XCTestCase {
     }
 }
 
+final class GoToPathTests: XCTestCase {
+    func testPastedPathsAreCleaned() {
+        let home = "/Users/x"
+        XCTAssertEqual(GoToPath.clean(" /a/b/ \n", home: home), "/a/b")
+        XCTAssertEqual(GoToPath.clean("\"/a b/c\"", home: home), "/a b/c")
+        XCTAssertEqual(GoToPath.clean("'/a b'", home: home), "/a b")
+        XCTAssertEqual(GoToPath.clean("/a\\ b/c", home: home), "/a b/c")
+        XCTAssertEqual(GoToPath.clean("~/Belgeler", home: home), "/Users/x/Belgeler")
+        XCTAssertEqual(GoToPath.clean("~", home: home), "/Users/x")
+        XCTAssertEqual(GoToPath.clean("file:///a%20b/c", home: home), "/a b/c")
+        XCTAssertEqual(GoToPath.clean("/", home: home), "/")
+        XCTAssertEqual(GoToPath.clean("alt", home: home), "alt")
+        XCTAssertNil(GoToPath.clean("   ", home: home))
+    }
+}
+
 final class LineDiffTests: XCTestCase {
     private func rows(_ a: String, _ b: String, ignoringSpace: Bool = false) -> [DiffRow] {
         LineDiff.compare(LineDiff.lines(of: a), LineDiff.lines(of: b), ignoringSpace: ignoringSpace)
