@@ -421,3 +421,7 @@
 "compare.older" = "Older";
 "compare.sameDate" = "Same date";
 "compare.newerFile" = "Newer: %@.";
+
+"key.finder" = "Finder";
+"menu.finder" = "Show in Finder";
+"finder.notLocal" = "A folder on a server or in an archive can't be shown in Finder.";

@@ -387,6 +387,21 @@ final class MainWindowTests: XCTestCase {
         XCTAssertEqual(files(), ["c.txt", "b.txt", "a.txt"])
     }
 
+    func testF12ShowsTheFolderInFinderWithTheCursorFileSelected() throws {
+        var shown: [URL] = []
+        controller.revealInFinder = { shown = $0 }
+        let panel = controller.left
+        var done = false
+        panel.load(path: root.path, select: "file.txt") { _ in done = true }
+        spin("loaded") { done }
+        panel.table.keyDown(with: key(111))
+        XCTAssertEqual(shown.map(\.path), [root.appendingPathComponent("file.txt").path])
+        panel.select(name: "..")
+        panel.table.keyDown(with: key(111))
+        XCTAssertEqual(shown.map(\.path), [root.path], "on .. the folder itself opens")
+        XCTAssertTrue(controller.functionButtonKeys.contains("F12"))
+    }
+
     func testGitButtonsAreListedAndChangesWaitForEnter() {
         let commands = Dictionary(uniqueKeysWithValues: TerminalPane.gitCommands.map { ($0.title, $0) })
         for title in ["status", "diff", "log", "branch"] { XCTAssertEqual(commands[title]?.run, true, title) }

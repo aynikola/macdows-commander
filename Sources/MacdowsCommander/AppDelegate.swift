@@ -82,6 +82,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let fileMenu = NSMenu(title: t("menu.file", []))
         fileMenu.addItem(item(t("menu.newWindow", []), #selector(newWindow(_:)), "n", target: self))
         fileMenu.addItem(item(t("menu.newFile", []), #selector(MainWindowController.newFileClicked(_:)), String(UnicodeScalar(NSF7FunctionKey)!), .shift))
+        fileMenu.addItem(item(t("menu.finder", []), #selector(MainWindowController.finderClicked(_:)), String(UnicodeScalar(NSF12FunctionKey)!), []))
         fileMenu.addItem(item(t("menu.compare", []), #selector(MainWindowController.compareClicked(_:)), String(UnicodeScalar(NSF3FunctionKey)!), .option))
         fileMenu.addItem(item(t("menu.mirror", []), #selector(MainWindowController.mirrorClicked(_:)), String(UnicodeScalar(NSF2FunctionKey)!), []))
         fileMenu.addItem(item(t("menu.sites", []), #selector(MainWindowController.showSiteManager(_:)), "k"))

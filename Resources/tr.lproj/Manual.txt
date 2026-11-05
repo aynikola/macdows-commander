@@ -39,6 +39,7 @@ F8 veya Delete (⌦) | Sil
 F9 | Alttaki terminal, bu klasörde
 F10 | Yazı editörü: bu HTML dosyası veya yeni belge
 F11 | Paylaş: işaretli dosyalar veya imlecin üstündeki dosya
+F12 | Klasörü Finder'da aç; işaretli dosyalar veya imleçteki dosya seçili gelir
 Shift+F9 | Ayrı Terminal penceresi
 
 ## Option ile

@@ -39,6 +39,7 @@ F8 or Delete (⌦) | Delete
 F9 | Bottom terminal, in this folder
 F10 | Writing editor: this HTML file, or a new document
 F11 | Share: the marked files, or the file under the cursor
+F12 | Open the folder in Finder, with the marked files or the file at the cursor selected
 Shift+F9 | Separate Terminal window
 
 ## With Option

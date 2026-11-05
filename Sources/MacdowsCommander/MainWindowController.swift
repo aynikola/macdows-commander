@@ -185,6 +185,7 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
             ("F9", "key.terminal", #selector(terminalClicked)),
             ("F10", "key.write", #selector(writerClicked)),
             ("F11", "key.share", #selector(shareClicked(_:))),
+            ("F12", "key.finder", #selector(finderClicked(_:))),
         ]
         var buttons: [NSButton] = []
         for (key, labelKey, action) in definitions {
@@ -409,6 +410,7 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
             if shift { openTerminal() } else { showTerminal() }
         case 109: openWriter() // F10
         case 103: shareFiles() // F11
+        case 111: showInFinder() // F12
         default:
             return panel.jumpToName(typed: event.characters ?? "")
         }
@@ -1268,6 +1270,31 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
                     if error != nil { self?.showError(L10n.t("goTo.notFound", path)) }
                 }
             }
+        }
+    }
+
+    // MARK: F12: Finder
+
+    /// Replaced in tests, where Finder would open.
+    var revealInFinder: (([URL]) -> Void)?
+
+    @objc func finderClicked(_ sender: Any?) { showInFinder() }
+
+    /// Opens the active folder in Finder with the marked files, or the file at the cursor, selected.
+    func showInFinder() {
+        let panel = active
+        guard !panel.source.isRemote, !panel.isInArchive else {
+            showToast(L10n.t("finder.notLocal"))
+            return
+        }
+        let folder = URL(fileURLWithPath: panel.path, isDirectory: true)
+        let picked = panel.selection.map { folder.appendingPathComponent($0.name) }
+        let urls = picked.isEmpty ? [folder] : picked
+        if let revealInFinder { return revealInFinder(urls) }
+        if picked.isEmpty {
+            NSWorkspace.shared.open(folder)
+        } else {
+            NSWorkspace.shared.activateFileViewerSelecting(urls)
         }
     }
 

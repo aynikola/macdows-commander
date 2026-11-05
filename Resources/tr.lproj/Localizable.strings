@@ -421,3 +421,7 @@
 "compare.older" = "Daha eski";
 "compare.sameDate" = "Tarih aynı";
 "compare.newerFile" = "Daha yeni: %@.";
+
+"key.finder" = "Finder";
+"menu.finder" = "Finder'da Göster";
+"finder.notLocal" = "Sunucudaki veya arşivdeki klasör Finder'da açılamaz.";
