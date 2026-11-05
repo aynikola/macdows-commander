@@ -5,6 +5,7 @@ A native two-panel file manager for macOS in the spirit of Windows Commander, wr
 - FTP, FTPS, SFTP and SCP, with saved servers
 - Built-in code editor with colors and JavaScript and PHP syntax checks
 - WYSIWYG HTML editor (F10)
+- Image editing in the F3 viewer: crop, image and canvas size, rotation, text with shadow; saves PNG, JPG and WebP, and opens PDF pages
 - Saved SSH connections with passwords, key files and jump hosts
 - Embedded terminal, archives, search and favorites
 - Cream, dark and original color themes

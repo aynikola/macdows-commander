@@ -991,7 +991,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     private func isImage(_ name: String) -> Bool {
         let ext = (name as NSString).pathExtension.lowercased()
-        if ext == "svg" { return true }
+        if ext == "svg" || ext == "pdf" { return true }
         return UTType(filenameExtension: ext)?.conforms(to: .image) ?? false
     }
 
@@ -1009,12 +1009,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         let images = panel.rows.filter { !$0.isDirectory && isImage($0.name) }
         guard let index = images.firstIndex(where: { $0.name == entry.name }) else { return }
         let items = images.map { image in
-            ViewerItem(name: image.name, size: image.size) { [weak self, weak panel] done in
+            ViewerItem(name: image.name, size: image.size, localFolder: panel.source.isRemote ? nil : panel.path) { [weak self, weak panel] done in
                 guard let self, let panel else { done(nil); return }
                 self.localCopy(of: image, in: panel, completion: done)
             }
         }
         let viewer = ImageViewerController(items: items, start: index)
+        viewer.onSaved = { [weak self] in self?.refreshPanels(nil) }
         viewer.onIndexChange = { [weak panel] name in panel?.select(name: name) }
         viewer.onEdit = { [weak self, weak panel] position in
             guard let self, let panel else { return }

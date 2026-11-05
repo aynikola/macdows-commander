@@ -106,6 +106,99 @@ final class RichEditorController: NSWindowController, NSWindowDelegate, WKNaviga
         document.execCommand(command, false, value === undefined ? null : value);
       };
 
+      const currentCell = () => {
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return null;
+        let node = selection.getRangeAt(0).startContainer;
+        if (node.nodeType !== 1) node = node.parentNode;
+        const cell = node.closest('td,th');
+        return cell && root.contains(cell) ? cell : null;
+      };
+      const columnOf = (cell) => {
+        let column = 0;
+        for (let other = cell.previousElementSibling; other; other = other.previousElementSibling) column += other.colSpan;
+        return column;
+      };
+      const cellAt = (row, column) => {
+        for (const cell of Array.from(row.cells)) {
+          const start = columnOf(cell);
+          if (column >= start && column < start + cell.colSpan) return cell;
+        }
+        return null;
+      };
+      const columnCount = (table) => Math.max(...Array.from(table.rows).map((row) => Array.from(row.cells).reduce((sum, cell) => sum + cell.colSpan, 0)));
+      const emptyCell = (tag) => {
+        const cell = document.createElement(tag);
+        cell.appendChild(document.createElement('br'));
+        return cell;
+      };
+      const newRow = (table) => {
+        const row = document.createElement('tr');
+        for (let i = 0, count = columnCount(table); i < count; i++) row.appendChild(emptyCell('td'));
+        return row;
+      };
+      const addCell = (row, column) => {
+        const covering = cellAt(row, column);
+        if (covering && columnOf(covering) < column) {
+          covering.colSpan += 1;
+          return covering;
+        }
+        const added = emptyCell(row.parentNode.tagName === 'THEAD' ? 'th' : 'td');
+        row.insertBefore(added, covering);
+        return added;
+      };
+      // Replaced through the editing command so that ⌘Z brings the old table back.
+      const swapTable = (table, copy, cursor) => {
+        cursor.setAttribute('data-mc-cursor', '1');
+        root.focus();
+        const range = document.createRange();
+        range.selectNode(table);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        document.execCommand('insertHTML', false, copy.outerHTML);
+        const placed = root.querySelector('[data-mc-cursor]');
+        if (!placed) return;
+        placed.removeAttribute('data-mc-cursor');
+        placeCursor(placed);
+      };
+      const placeCursor = (cell) => {
+        const range = document.createRange();
+        range.selectNodeContents(cell);
+        range.collapse(true);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      };
+      const removeTable = (table) => {
+        root.focus();
+        const holder = table.parentNode.classList && table.parentNode.classList.contains('table-wrapper') ? table.parentNode : table;
+        const range = document.createRange();
+        range.selectNode(holder);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        document.execCommand('delete');
+        // The browser keeps the emptied wrapper around the cursor.
+        for (const wrapper of Array.from(root.querySelectorAll('.table-wrapper'))) {
+          if (wrapper.querySelector('table') || wrapper.textContent.trim()) continue;
+          const neighbor = wrapper.nextElementSibling || wrapper.previousElementSibling;
+          wrapper.remove();
+          if (neighbor) placeCursor(neighbor);
+        }
+      };
+      root.addEventListener('keydown', (event) => {
+        if (event.key !== 'Tab') return;
+        const cell = currentCell();
+        if (!cell) return;
+        event.preventDefault();
+        const table = cell.closest('table');
+        const cells = Array.from(table.querySelectorAll('td,th'));
+        const next = cells[cells.indexOf(cell) + (event.shiftKey ? -1 : 1)];
+        if (next) placeCursor(next);
+        else if (!event.shiftKey) mc.tableEdit('rowBelow');
+      });
+
       // Pasted pages bring their own styles, which would fight the theme. Structure stays, styling goes.
       function clean(html) {
         const page = new DOMParser().parseFromString(html, 'text/html');
@@ -158,6 +251,59 @@ final class RichEditorController: NSWindowController, NSWindowDelegate, WKNaviga
           const row = (tag) => '<tr>' + cell(tag) + cell(tag) + cell(tag) + '</tr>';
           run('insertHTML', '<div class="table-wrapper"><table><thead>' + row('th') + '</thead><tbody>' + row('td') + row('td') + '</tbody></table></div><p><br></p>');
         },
+        // What the Table menu does at the cursor. False means the cursor is not in a table.
+        tableEdit: (action) => {
+          const cell = currentCell();
+          if (!cell) return false;
+          const table = cell.closest('table');
+          const rowIndex = Array.from(table.rows).indexOf(cell.parentNode);
+          const cellIndex = cell.cellIndex;
+          if (action === 'deleteTable') { removeTable(table); return true; }
+          const copy = table.cloneNode(true);
+          const row = copy.rows[rowIndex];
+          const here = row.cells[cellIndex];
+          const start = columnOf(here);
+          let cursor = null;
+          if (action === 'rowAbove' || action === 'rowBelow') {
+            const fresh = newRow(copy);
+            if (row.parentNode.tagName === 'THEAD') {
+              let body = copy.tBodies[0];
+              if (!body) body = copy.appendChild(document.createElement('tbody'));
+              body.insertBefore(fresh, body.firstChild);
+            } else {
+              row.parentNode.insertBefore(fresh, action === 'rowAbove' ? row : row.nextSibling);
+            }
+            cursor = fresh.cells[0];
+          } else if (action === 'columnLeft' || action === 'columnRight') {
+            const column = action === 'columnLeft' ? start : start + here.colSpan;
+            for (const each of Array.from(copy.rows)) {
+              const added = addCell(each, column);
+              if (each === row) cursor = added;
+            }
+          } else if (action === 'deleteRow') {
+            if (copy.rows.length === 1) { removeTable(table); return true; }
+            const rows = Array.from(copy.rows);
+            const next = rows[rowIndex + 1] || rows[rowIndex - 1];
+            const section = row.parentNode;
+            row.remove();
+            if (!section.rows.length) section.remove();
+            cursor = next.cells[Math.min(cellIndex, next.cells.length - 1)];
+          } else if (action === 'deleteColumn') {
+            if (columnCount(copy) === 1) { removeTable(table); return true; }
+            for (const each of Array.from(copy.rows)) {
+              const found = cellAt(each, start);
+              if (!found) continue;
+              if (found.colSpan > 1) found.colSpan -= 1; else found.remove();
+              if (!each.cells.length) each.remove();
+            }
+            const left = copy.rows[Math.min(rowIndex, copy.rows.length - 1)];
+            cursor = left.cells[Math.min(cellIndex, left.cells.length - 1)];
+          } else {
+            return false;
+          }
+          swapTable(table, copy, cursor);
+          return true;
+        },
         // Wraps the selection, or the paragraph the cursor is in, in a callout or header box.
         box: (classes) => {
           root.focus();
@@ -206,7 +352,7 @@ final class RichEditorController: NSWindowController, NSWindowDelegate, WKNaviga
         self.folder = folder
         self.source = source
         self.queue = queue
-        page = file.map { RichDocument.parse($0.text) } ?? .blank
+        page = file.map { RichDocument.parse($0.text) } ?? .starter(content: Self.demoContent())
         encoded = file ?? EditorDocument(text: "", encoding: .utf8, usesCRLF: false)
         handler = DocumentFilesHandler(source: source, queue: queue)
 
@@ -233,6 +379,17 @@ final class RichEditorController: NSWindowController, NSWindowDelegate, WKNaviga
     }
 
     required init?(coder: NSCoder) { fatalError("Not used") }
+
+    /// The sample a new document opens with, from Resources/<language>.lproj/WriterDemo.html.
+    private static func demoContent() -> String? {
+        for code in [L10n.language, "en"] {
+            if let path = Bundle.main.path(forResource: "WriterDemo", ofType: "html", inDirectory: nil, forLocalization: code),
+               let text = try? String(contentsOfFile: path, encoding: .utf8) {
+                return text
+            }
+        }
+        return nil
+    }
 
     private func load() {
         var base = URLComponents()
@@ -297,7 +454,11 @@ final class RichEditorController: NSWindowController, NSWindowDelegate, WKNaviga
             command("—", 10, tip: L10n.t("rich.rule")), command("</>", 11, tip: L10n.t("rich.code")),
             action("🔗", tip: L10n.t("rich.link") + " ⌘K", #selector(linkClicked)),
             action("🖼", tip: L10n.t("rich.image"), #selector(imageClicked)),
-            command("▦", 12, tip: L10n.t("rich.table")),
+            pulldown(L10n.t("rich.table"), [
+                (L10n.t("rich.table.new"), "new"), (L10n.t("rich.table.rowAbove"), "rowAbove"), (L10n.t("rich.table.rowBelow"), "rowBelow"),
+                (L10n.t("rich.table.columnLeft"), "columnLeft"), (L10n.t("rich.table.columnRight"), "columnRight"),
+                (L10n.t("rich.table.deleteRow"), "deleteRow"), (L10n.t("rich.table.deleteColumn"), "deleteColumn"), (L10n.t("rich.table.deleteTable"), "deleteTable"),
+            ], #selector(tableChosen(_:))),
             pulldown(L10n.t("rich.box"), boxes, #selector(boxChosen(_:))),
             pulldown(L10n.t("rich.header"), headers, #selector(boxChosen(_:))),
             command("↶", 13, tip: "⌘Z"), command("↷", 14, tip: "⌘⇧Z"),
@@ -361,6 +522,19 @@ final class RichEditorController: NSWindowController, NSWindowDelegate, WKNaviga
     func runCommand(_ index: Int) {
         guard Self.commands.indices.contains(index) else { return }
         evaluate(Self.commands[index])
+    }
+
+    @objc private func tableChosen(_ sender: NSMenuItem) {
+        guard let action = sender.representedObject as? String else { return }
+        if action == "new" {
+            evaluate(Self.commands[12])
+            return
+        }
+        evaluate("mc.tableEdit(\(Self.quoted(action)))") { [weak self] result in
+            guard (result as? Bool) != true else { return }
+            NSSound.beep()
+            self?.onMessage?(L10n.t("rich.table.noCell"))
+        }
     }
 
     @objc private func boxChosen(_ sender: NSMenuItem) {

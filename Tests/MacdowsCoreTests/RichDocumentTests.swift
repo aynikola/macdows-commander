@@ -42,4 +42,12 @@ final class RichDocumentTests: XCTestCase {
         XCTAssertFalse(RichDocument.containsServerCode("<?xml version=\"1.0\"?><p>x</p>"))
         XCTAssertFalse(RichDocument.containsServerCode("<p>1 < 2</p>"))
     }
+
+    func testStarterContentReplacesTheEmptyPage() {
+        let page = RichDocument.starter(content: "<h1>Demo</h1>")
+        XCTAssertTrue(page.display.contains("<h1>Demo</h1>"))
+        XCTAssertTrue(page.display.contains("theme-balmy"))
+        XCTAssertEqual(RichDocument.starter(content: nil), .blank)
+        XCTAssertEqual(RichDocument.starter(content: ""), .blank)
+    }
 }

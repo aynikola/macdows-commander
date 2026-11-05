@@ -60,6 +60,13 @@ Right, Down, Space, Page Down | Next image
 Left, Up, Page Up | Previous image
 Home / End | First / last image
 + / - / 0 | Zoom in / out / fit
+C | Crop: drag, Enter applies, Esc cancels
+R | Image size
+K | Canvas size
+[ / ] | Rotate left / right
+T | Text on the picture: color, font, shadow; drag it to move it
+⌘Z / ⌘⇧Z | Undo / redo
+⌘S | Save as PNG, JPG or WebP
 F4 | Open in the editor
 Esc or F3 | Close
 
@@ -116,7 +123,7 @@ Through another server | First save that server, then pick it under Connect thro
 Leave the password empty and the terminal asks for it, which also suits one-time codes.
 
 ## Writing editor
-F10 opens the HTML file under the cursor as you'd read it, or starts a new document in the Balmy style. Write directly on the page; the buttons at the top add headings, lists, tables and colored boxes.
+F10 opens the HTML file under the cursor as you'd read it, or starts a new document in the Balmy style. Write directly on the page; the buttons at the top add headings, lists, tables and colored boxes. The Table menu adds and removes rows and columns. Tab moves to the next cell.
 ⌘B ⌘I ⌘U | Bold, italic, underline
 ⌘1 ⌘2 ⌘3 ⌘0 | Heading 1, 2, 3, plain paragraph
 ⌘K | Link

@@ -99,6 +99,130 @@ final class RichEditorTests: XCTestCase {
         XCTAssertFalse(html.contains("bad()"))
     }
 
+    private let tablePage = """
+    <!doctype html><html><body><article class="theme-balmy"><h1>T</h1><div class="table-wrapper"><table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td id="c">1</td><td>2</td></tr><tr><td>3</td><td>4</td></tr></tbody></table></div><p>Son</p></article></body></html>
+    """
+
+    /// The table's cells by row, as text.
+    private func cells(_ editor: RichEditorController) -> [[String]] {
+        run(editor, "Array.from(document.querySelectorAll('article table tr')).map(r => Array.from(r.cells).map(c => c.textContent))") as? [[String]] ?? []
+    }
+
+    private func putCursor(_ editor: RichEditorController, row: Int, cell: Int) {
+        _ = run(editor, "(() => { const c = document.querySelector('article table').rows[\(row)].cells[\(cell)]; const r = document.createRange(); r.selectNodeContents(c); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.querySelector('article').focus(); return 1; })()")
+    }
+
+    private func table(_ editor: RichEditorController, _ action: String) -> Any? {
+        run(editor, "mc.tableEdit('\(action)')")
+    }
+
+    func testTableRowsAndColumnsAreAddedWhereTheCursorIs() throws {
+        let (editor, _) = try open(tablePage)
+        putCursor(editor, row: 1, cell: 0)
+        XCTAssertEqual(table(editor, "rowAbove") as? Bool, true)
+        XCTAssertEqual(cells(editor), [["A", "B"], ["", ""], ["1", "2"], ["3", "4"]])
+        XCTAssertEqual(run(editor, "document.querySelectorAll('article table').length") as? Int, 1, "the table is replaced, not nested")
+        XCTAssertEqual(run(editor, "document.querySelector('article .table-wrapper table') !== null") as? Bool, true)
+        XCTAssertEqual(run(editor, "document.querySelector('[data-mc-cursor]') === null") as? Bool, true)
+        XCTAssertEqual(run(editor, "getSelection().anchorNode.closest ? getSelection().anchorNode.closest('tr').rowIndex : getSelection().anchorNode.parentNode.closest('tr').rowIndex") as? Int, 1, "the cursor goes to the new row")
+
+        putCursor(editor, row: 2, cell: 1)
+        _ = table(editor, "rowBelow")
+        XCTAssertEqual(cells(editor), [["A", "B"], ["", ""], ["1", "2"], ["", ""], ["3", "4"]])
+
+        putCursor(editor, row: 2, cell: 0)
+        _ = table(editor, "columnRight")
+        XCTAssertEqual(cells(editor), [["A", "", "B"], ["", "", ""], ["1", "", "2"], ["", "", ""], ["3", "", "4"]])
+        XCTAssertEqual(run(editor, "document.querySelector('article thead tr').cells[1].tagName") as? String, "TH")
+
+        putCursor(editor, row: 2, cell: 0)
+        _ = table(editor, "columnLeft")
+        XCTAssertEqual(cells(editor)[2], ["", "1", "", "2"])
+        XCTAssertTrue(editor.isDirty)
+    }
+
+    func testTheTableMenuItemsRunTheirActions() throws {
+        let (editor, _) = try open(tablePage)
+        func popups(_ view: NSView) -> [NSPopUpButton] { (view as? NSPopUpButton).map { [$0] } ?? view.subviews.flatMap(popups) }
+        let all = popups(try XCTUnwrap(editor.window?.contentView))
+        let menu = try XCTUnwrap(all.first { $0.itemArray.contains { $0.representedObject as? String == "rowBelow" } }?.menu)
+        func choose(_ action: String) throws {
+            let position = try XCTUnwrap(menu.items.firstIndex { $0.representedObject as? String == action })
+            menu.performActionForItem(at: position)
+            _ = run(editor, "1")
+        }
+        putCursor(editor, row: 1, cell: 0)
+        try choose("rowBelow")
+        XCTAssertEqual(cells(editor).count, 4)
+        putCursor(editor, row: 1, cell: 0)
+        try choose("columnRight")
+        XCTAssertEqual(cells(editor)[1], ["1", "", "2"])
+        putCursor(editor, row: 1, cell: 1)
+        try choose("deleteColumn")
+        XCTAssertEqual(cells(editor)[1], ["1", "2"])
+        putCursor(editor, row: 1, cell: 0)
+        try choose("deleteRow")
+        XCTAssertEqual(cells(editor).count, 3)
+        putCursor(editor, row: 1, cell: 0)
+        try choose("deleteTable")
+        XCTAssertEqual(cells(editor), [])
+        try choose("new")
+        XCTAssertEqual(cells(editor).count, 3, "a new table")
+    }
+
+    func testARowAddedFromTheHeaderGoesIntoTheBody() throws {
+        let (editor, _) = try open(tablePage)
+        putCursor(editor, row: 0, cell: 0)
+        _ = table(editor, "rowBelow")
+        XCTAssertEqual(cells(editor), [["A", "B"], ["", ""], ["1", "2"], ["3", "4"]])
+        XCTAssertEqual(run(editor, "document.querySelectorAll('article thead tr').length") as? Int, 1)
+    }
+
+    func testTableRowsAndColumnsAreDeleted() throws {
+        let (editor, _) = try open(tablePage)
+        putCursor(editor, row: 1, cell: 1)
+        _ = table(editor, "deleteRow")
+        XCTAssertEqual(cells(editor), [["A", "B"], ["3", "4"]])
+        putCursor(editor, row: 1, cell: 0)
+        _ = table(editor, "deleteColumn")
+        XCTAssertEqual(cells(editor), [["B"], ["4"]])
+        putCursor(editor, row: 1, cell: 0)
+        _ = table(editor, "deleteColumn")
+        XCTAssertEqual(cells(editor), [], "the last column takes the table with it")
+        XCTAssertEqual(run(editor, "document.querySelector('article .table-wrapper') === null") as? Bool, true)
+        XCTAssertEqual(run(editor, "document.querySelector('article').textContent.includes('Son')") as? Bool, true)
+    }
+
+    func testDeletingTheTableAndUndoingBringsItBack() throws {
+        let (editor, _) = try open(tablePage)
+        putCursor(editor, row: 1, cell: 0)
+        _ = table(editor, "rowBelow")
+        XCTAssertEqual(cells(editor).count, 4)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        _ = run(editor, "mc.run('undo')")
+        XCTAssertEqual(cells(editor), [["A", "B"], ["1", "2"], ["3", "4"]], "⌘Z undoes a table change")
+        putCursor(editor, row: 1, cell: 0)
+        _ = table(editor, "deleteTable")
+        XCTAssertEqual(cells(editor), [])
+    }
+
+    func testTableActionOutsideATableSaysSo() throws {
+        let (editor, _) = try open(tablePage)
+        _ = run(editor, "(() => { const r = document.createRange(); r.selectNodeContents(document.querySelector('article h1')); getSelection().removeAllRanges(); getSelection().addRange(r); })()")
+        XCTAssertEqual(table(editor, "rowBelow") as? Bool, false)
+    }
+
+    func testTableChangesAreSavedWithoutEditorMarks() throws {
+        let (editor, url) = try open(tablePage)
+        putCursor(editor, row: 1, cell: 0)
+        _ = table(editor, "rowBelow")
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        XCTAssertTrue(save(editor))
+        let text = try String(contentsOf: url, encoding: .utf8)
+        XCTAssertFalse(text.contains("data-mc"))
+        XCTAssertEqual(text.components(separatedBy: "<tr").count - 1, 4)
+    }
+
     func testNewDocumentAsksForANameAndNeverOverwritesSilently() throws {
         let (editor, _) = try open(nil)
         let existing = folder.appendingPathComponent("var.html")

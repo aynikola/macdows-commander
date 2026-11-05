@@ -14,6 +14,12 @@ public struct RichDocument: Equatable {
         RichDocument(prefix: balmyTemplate, content: "\n<h1></h1>\n<p><br></p>\n", suffix: closing)
     }
 
+    /// A new document that starts with this content instead of an empty page.
+    public static func starter(content: String?) -> RichDocument {
+        guard let content, !content.isEmpty else { return blank }
+        return RichDocument(prefix: balmyTemplate, content: content, suffix: closing)
+    }
+
     private static func regex(_ pattern: String) -> NSRegularExpression {
         // The patterns are fixed text, so a failure here is a programming mistake.
         try! NSRegularExpression(pattern: pattern, options: [.caseInsensitive])

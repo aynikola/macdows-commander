@@ -60,6 +60,13 @@ Sağ, Aşağı, Boşluk, Page Down | Sonraki resim
 Sol, Yukarı, Page Up | Önceki resim
 Home / End | İlk / son resim
 + / - / 0 | Yakınlaştır / uzaklaştır / sığdır
+C | Kırp: sürükleyin, Enter uygular, Esc vazgeçer
+R | Resim boyutu
+K | Tuval boyutu
+[ / ] | Sola / sağa döndür
+T | Resme yazı: renk, yazı tipi, gölge; resimde sürükleyerek taşınır
+⌘Z / ⌘⇧Z | Geri al / yinele
+⌘S | Farklı kaydet: PNG, JPG, WebP
 F4 | Editörde aç
 Esc veya F3 | Kapat
 
@@ -116,7 +123,7 @@ Başka sunucu üzerinden | Önce o sunucuyu kaydedin, sonra Şunun üzerinden al
 Parolayı boş bırakırsanız terminal sorar; tek kullanımlık kodlar için de bu uygundur.
 
 ## Yazı editörü
-F10 imlecin üstündeki HTML dosyasını okunacağı haliyle açar, başka yerdeyseniz Balmy stilinde yeni belge başlatır. Doğrudan sayfanın üstüne yazarsınız; üstteki düğmeler başlık, liste, tablo ve renkli kutu ekler.
+F10 imlecin üstündeki HTML dosyasını okunacağı haliyle açar, başka yerdeyseniz Balmy stilinde yeni belge başlatır. Doğrudan sayfanın üstüne yazarsınız; üstteki düğmeler başlık, liste, tablo ve renkli kutu ekler. Tablo menüsü satır ve sütun ekler, siler. Tab sonraki hücreye geçer.
 ⌘B ⌘I ⌘U | Kalın, italik, altı çizili
 ⌘1 ⌘2 ⌘3 ⌘0 | Başlık 1, 2, 3, düz paragraf
 ⌘K | Bağlantı

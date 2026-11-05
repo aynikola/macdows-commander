@@ -1,16 +1,24 @@
 import AppKit
 import ImageIO
+import MacdowsCore
 
 /// One image in the viewer. `fetch` gives a local file: right away on disk, after a download on a server.
 struct ViewerItem {
     let name: String
     let size: Int64
+    /// Where Save As starts. Nil for a file on a server.
+    var localFolder: String? = nil
     let fetch: (@escaping (URL?) -> Void) -> Void
 }
 
 private enum ImageDecoder {
     /// Decoding at screen size instead of full size is what makes flipping through photos instant.
-    static func decode(_ url: URL, maxPixels: Int) -> (image: NSImage, pixelSize: NSSize)? {
+    static func decode(_ url: URL, maxPixels: Int, pdfPage: Int = 0) -> (image: NSImage, pixelSize: NSSize)? {
+        if url.pathExtension.lowercased() == "pdf" {
+            guard let page = ImageOps.renderPDF(url, page: pdfPage, dpi: 144, maxPixelSide: maxPixels) else { return nil }
+            let size = NSSize(width: page.width, height: page.height)
+            return (NSImage(cgImage: page, size: size), size)
+        }
         if let source = CGImageSourceCreateWithURL(url as CFURL, nil), CGImageSourceGetCount(source) > 0 {
             let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
             let width = (props?[kCGImagePropertyPixelWidth] as? Int) ?? 0
@@ -34,14 +42,21 @@ private enum ImageDecoder {
 
 private final class ViewerWindow: NSWindow {
     var onKey: ((NSEvent) -> Bool)?
+    var onCancel: (() -> Void)?
 
     override func keyDown(with event: NSEvent) {
         if onKey?(event) == true { return }
         super.keyDown(with: event)
     }
 
+    /// ⌘S and ⌘Z belong to the picture, unless a text field has the cursor.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if !(firstResponder is NSText), attachedSheet == nil, onKey?(event) == true { return true }
+        return super.performKeyEquivalent(with: event)
+    }
+
     override func cancelOperation(_ sender: Any?) {
-        close()
+        onCancel?()
     }
 }
 
@@ -62,18 +77,48 @@ private final class ThumbView: NSImageView {
     override func mouseDown(with event: NSEvent) { onClick?() }
 }
 
-final class ImageViewerController: NSWindowController, NSWindowDelegate {
-    private let items: [ViewerItem]
-    private var index: Int
+final class ImageViewerController: NSWindowController, NSWindowDelegate, NSTextFieldDelegate, DocumentWindow {
+    let items: [ViewerItem]
+    private(set) var index: Int
     private var zoom: CGFloat = 1
-    private var generation = 0
-    private let cache = NSCache<NSString, CachedImage>()
-    private let decodeQueue = DispatchQueue(label: "macdows.viewer.decode", qos: .userInitiated, attributes: .concurrent)
+    private(set) var generation = 0
+    let cache = NSCache<NSString, CachedImage>()
+    let decodeQueue = DispatchQueue(label: "macdows.viewer.decode", qos: .userInitiated, attributes: .concurrent)
     private let thumbQueue = DispatchQueue(label: "macdows.viewer.thumbs", qos: .utility, attributes: .concurrent)
     private let thumbSlots = DispatchSemaphore(value: 4)
 
     private let scroll = NSScrollView()
-    private let imageView = NSImageView()
+    let imageView = NSImageView()
+    let overlay = ImageOverlayView()
+    /// Set once the picture is being edited: it holds the full picture and the undo steps.
+    var session: ImageEditHistory?
+    /// The picture's real size, which can be larger than what was decoded for the screen.
+    var displayPixels = NSSize.zero
+    private var didFitWindow = false
+    var resizeFields: ResizeFields?
+    var pdfPage = 0
+    var pdfPageCount = 0
+    var pdfDPI: CGFloat = 200
+
+    let undoButton = NSButton()
+    let redoButton = NSButton()
+    let pdfDPIPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let pdfGroup = NSStackView()
+    private let pdfLabel = NSTextField(labelWithString: "")
+    let cropBar = NSStackView()
+    let cropLabel = NSTextField(labelWithString: "")
+    let textBar = NSStackView()
+    let textField = NSTextField(string: "")
+    let textFont = NSPopUpButton(frame: .zero, pullsDown: false)
+    let textSize = NSTextField(string: "48")
+    let textBold = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    let textColor = NSColorWell(frame: NSRect(x: 0, y: 0, width: 40, height: 22))
+    let textShadow = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    let shadowColor = NSColorWell(frame: NSRect(x: 0, y: 0, width: 40, height: 22))
+    let shadowBlur = NSTextField(string: "8")
+    let shadowX = NSTextField(string: "3")
+    let shadowY = NSTextField(string: "3")
+    var onSaved: (() -> Void)?
     private let thumbStack = NSStackView()
     private var thumbs: [ThumbView] = []
     private var maxPixels = 2560
@@ -82,7 +127,7 @@ final class ImageViewerController: NSWindowController, NSWindowDelegate {
     var onEdit: ((Int) -> Void)?
     var onClosed: (() -> Void)?
 
-    private final class CachedImage {
+    final class CachedImage {
         let image: NSImage
         let pixelSize: NSSize
         init(image: NSImage, pixelSize: NSSize) {
@@ -94,17 +139,20 @@ final class ImageViewerController: NSWindowController, NSWindowDelegate {
     init(items: [ViewerItem], start: Int) {
         self.items = items
         self.index = start
-        let frame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1200, height: 800)
-        let window = ViewerWindow(contentRect: frame, styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView], backing: .buffered, defer: false)
+        let screen = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1200, height: 800)
+        let window = ViewerWindow(contentRect: NSRect(x: 0, y: 0, width: min(980, screen.width), height: min(680, screen.height)), styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.backgroundColor = .black
         window.appearance = NSAppearance(named: .darkAqua)
+        window.center()
         super.init(window: window)
         window.delegate = self
         window.onKey = { [weak self] in self?.handleKey($0) ?? false }
+        window.onCancel = { [weak self] in self?.escapePressed() }
         let scale = NSScreen.main?.backingScaleFactor ?? 2
-        maxPixels = Int(max(frame.width, frame.height) * scale)
+        maxPixels = Int(max(screen.width, screen.height) * scale)
         cache.countLimit = 12
+        OpenDocuments.add(self)
         build(in: window)
         buildThumbs()
         show(index: start)
@@ -124,6 +172,14 @@ final class ImageViewerController: NSWindowController, NSWindowDelegate {
         scroll.documentView = imageView
         scroll.translatesAutoresizingMaskIntoConstraints = false
         imageView.imageScaling = .scaleProportionallyUpOrDown
+        overlay.isHidden = true
+        overlay.autoresizingMask = [.width, .height]
+        overlay.frame = imageView.bounds
+        overlay.onChange = { [weak self] in self?.updateCropLabel() }
+        imageView.addSubview(overlay)
+        let toolbar = buildToolbar()
+        buildCropBar()
+        buildTextBar()
 
         thumbStack.orientation = .horizontal
         thumbStack.spacing = 6
@@ -136,13 +192,25 @@ final class ImageViewerController: NSWindowController, NSWindowDelegate {
         strip.autohidesScrollers = true
         strip.translatesAutoresizingMaskIntoConstraints = false
 
+        let bars = NSStackView(views: [cropBar, textBar])
+        bars.orientation = .vertical
+        bars.spacing = 0
+        bars.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(toolbar)
         content.addSubview(scroll)
+        content.addSubview(bars)
         content.addSubview(strip)
         NSLayoutConstraint.activate([
-            scroll.topAnchor.constraint(equalTo: content.topAnchor),
+            toolbar.topAnchor.constraint(equalTo: content.safeAreaLayoutGuide.topAnchor),
+            toolbar.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            toolbar.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: toolbar.bottomAnchor),
             scroll.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            scroll.bottomAnchor.constraint(equalTo: strip.topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: bars.topAnchor),
+            bars.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            bars.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            bars.bottomAnchor.constraint(equalTo: strip.topAnchor),
             strip.leadingAnchor.constraint(equalTo: content.leadingAnchor),
             strip.trailingAnchor.constraint(equalTo: content.trailingAnchor),
             strip.bottomAnchor.constraint(equalTo: content.bottomAnchor),
@@ -151,6 +219,98 @@ final class ImageViewerController: NSWindowController, NSWindowDelegate {
             thumbStack.leadingAnchor.constraint(equalTo: strip.contentView.leadingAnchor),
         ])
     }
+
+    private func buildToolbar() -> NSView {
+        let tool = { [unowned self] (key: String, selector: Selector) in ImageEditUI.button(L10n.t(key), self, selector) }
+        undoButton.title = "↶"
+        redoButton.title = "↷"
+        for (button, selector, tip) in [(undoButton, #selector(undoClicked), "⌘Z"), (redoButton, #selector(redoClicked), "⌘⇧Z")] {
+            button.bezelStyle = .rounded
+            button.controlSize = .small
+            button.refusesFirstResponder = true
+            button.target = self
+            button.action = selector
+            button.toolTip = tip
+            button.isEnabled = false
+        }
+        let previous = ImageEditUI.button("◀", self, #selector(previousPageClicked))
+        let next = ImageEditUI.button("▶", self, #selector(nextPageClicked))
+        pdfLabel.font = AppFont.interface(12)
+        pdfDPIPopup.controlSize = .small
+        pdfDPIPopup.font = AppFont.interface(12)
+        pdfDPIPopup.refusesFirstResponder = true
+        pdfDPIPopup.addItems(withTitles: ["72", "150", "200", "300", "600"])
+        pdfDPIPopup.selectItem(withTitle: "200")
+        pdfDPIPopup.target = self
+        pdfDPIPopup.action = #selector(dpiChanged)
+        [previous, pdfLabel, next, ImageEditUI.labeled("DPI", pdfDPIPopup)].forEach { pdfGroup.addArrangedSubview($0) }
+        pdfGroup.spacing = 4
+        pdfGroup.isHidden = true
+        let views: [NSView] = [
+            tool("image.crop", #selector(cropClicked)), tool("image.resize", #selector(resizeClicked)), tool("image.canvas", #selector(canvasClicked)),
+            ImageEditUI.button("↺", tip: L10n.t("image.rotateLeft") + " [", self, #selector(rotateLeftClicked)),
+            ImageEditUI.button("↻", tip: L10n.t("image.rotateRight") + " ]", self, #selector(rotateRightClicked)),
+            tool("image.rotate", #selector(rotateAngleClicked)),
+            ImageEditUI.button("⇋", tip: L10n.t("image.flipH"), self, #selector(flipHorizontalClicked)),
+            ImageEditUI.button("⇅", tip: L10n.t("image.flipV"), self, #selector(flipVerticalClicked)),
+            tool("image.text", #selector(textClicked)), undoButton, redoButton, tool("image.saveAs", #selector(saveAsClicked)), pdfGroup,
+        ]
+        let toolbar = NSStackView(views: views + [NSView()])
+        toolbar.spacing = 4
+        toolbar.edgeInsets = NSEdgeInsets(top: 5, left: 8, bottom: 5, right: 8)
+        toolbar.translatesAutoresizingMaskIntoConstraints = false
+        return toolbar
+    }
+
+    private func buildCropBar() {
+        cropLabel.font = AppFont.interface(12)
+        [ImageEditUI.button(L10n.t("image.apply"), self, #selector(applyTool)), ImageEditUI.button(L10n.t("image.cancel"), self, #selector(cancelTool)), cropLabel, NSView()].forEach { cropBar.addArrangedSubview($0) }
+        cropBar.spacing = 6
+        cropBar.edgeInsets = NSEdgeInsets(top: 5, left: 8, bottom: 5, right: 8)
+        cropBar.isHidden = true
+    }
+
+    private func buildTextBar() {
+        textField.placeholderString = L10n.t("image.textHint")
+        textField.controlSize = .small
+        textField.font = AppFont.interface(12)
+        textField.delegate = self
+        textField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        textField.widthAnchor.constraint(greaterThanOrEqualToConstant: 160).isActive = true
+        textFont.controlSize = .small
+        textFont.font = AppFont.interface(12)
+        textFont.addItems(withTitles: NSFontManager.shared.availableFontFamilies.filter { !$0.hasPrefix(".") })
+        textFont.selectItem(withTitle: "Helvetica")
+        textFont.refusesFirstResponder = true
+        textFont.widthAnchor.constraint(equalToConstant: 130).isActive = true
+        textBold.title = L10n.t("image.bold")
+        textShadow.title = L10n.t("image.shadow")
+        textShadow.state = .on
+        textColor.color = .white
+        shadowColor.color = .black
+        for control in [textFont, textBold, textShadow, textColor, shadowColor] as [NSControl] {
+            control.target = self
+            control.action = #selector(textChanged)
+        }
+        for well in [textColor, shadowColor] { well.widthAnchor.constraint(equalToConstant: 40).isActive = true }
+        for (field, width) in [(textSize, CGFloat(46)), (shadowBlur, 34), (shadowX, 34), (shadowY, 34)] {
+            field.controlSize = .small
+            field.font = AppFont.interface(12)
+            field.delegate = self
+            field.widthAnchor.constraint(equalToConstant: width).isActive = true
+        }
+        let views: [NSView] = [
+            textField, textFont, ImageEditUI.labeled(L10n.t("image.size"), textSize), textBold, textColor,
+            textShadow, shadowColor, ImageEditUI.labeled(L10n.t("image.blur"), shadowBlur), ImageEditUI.labeled("X", shadowX), ImageEditUI.labeled("Y", shadowY),
+            ImageEditUI.button(L10n.t("image.apply"), self, #selector(applyTool)), ImageEditUI.button(L10n.t("image.cancel"), self, #selector(cancelTool)),
+        ]
+        views.forEach { textBar.addArrangedSubview($0) }
+        textBar.spacing = 6
+        textBar.edgeInsets = NSEdgeInsets(top: 5, left: 8, bottom: 5, right: 8)
+        textBar.isHidden = true
+    }
+
+    func controlTextDidChange(_ notification: Notification) { textChanged() }
 
     private func buildThumbs() {
         guard items.count > 1 else { return }
@@ -162,7 +322,7 @@ final class ImageViewerController: NSWindowController, NSWindowDelegate {
             button.layer?.borderColor = NSColor.white.cgColor
             button.layer?.cornerRadius = 3
             button.toolTip = item.name
-            button.onClick = { [weak self] in self?.show(index: position) }
+            button.onClick = { [weak self] in self?.navigate(to: position) }
             button.widthAnchor.constraint(equalToConstant: 96).isActive = true
             button.heightAnchor.constraint(equalToConstant: 64).isActive = true
             thumbStack.addArrangedSubview(button)
@@ -189,10 +349,28 @@ final class ImageViewerController: NSWindowController, NSWindowDelegate {
 
     // MARK: Showing
 
-    private func show(index newIndex: Int) {
+    private func navigate(to newIndex: Int) {
+        let target = max(0, min(items.count - 1, newIndex))
+        guard target != index else { return }
+        leaveEdits { [weak self] in self?.show(index: target) }
+    }
+
+    func reshowCurrent() { show(index: index, keepPage: true) }
+
+    private func cacheKey(_ name: String, page: Int) -> NSString { "\(name)#\(page)" as NSString }
+
+    private func show(index newIndex: Int, keepPage: Bool = false) {
         index = max(0, min(items.count - 1, newIndex))
         zoom = 1
         generation += 1
+        cancelTool()
+        session = nil
+        imageView.layer?.backgroundColor = nil
+        if !keepPage {
+            pdfPage = 0
+            pdfPageCount = 0
+        }
+        refreshEditState()
         let current = generation
         let item = items[index]
         onIndexChange?(item.name)
@@ -200,11 +378,11 @@ final class ImageViewerController: NSWindowController, NSWindowDelegate {
             thumb.layer?.borderWidth = position == index ? 2 : 0
         }
         if !thumbs.isEmpty { thumbs[index].scrollToVisible(thumbs[index].bounds) }
-        if let cached = cache.object(forKey: item.name as NSString) {
+        if let cached = cache.object(forKey: cacheKey(item.name, page: pdfPage)) {
             present(cached, for: item)
         } else {
             window?.title = "\(item.name) — \(index + 1) / \(items.count)"
-            load(position: index) { [weak self] cached in
+            load(position: index, page: pdfPage) { [weak self] cached in
                 guard let self, current == self.generation else { return }
                 if let cached { self.present(cached, for: item) } else { self.imageView.image = nil }
             }
@@ -214,11 +392,27 @@ final class ImageViewerController: NSWindowController, NSWindowDelegate {
             load(position: index + offset, completion: nil)
         }
         loadThumbs(around: index)
+        updatePDFControls(item)
     }
 
-    private func load(position: Int, completion: ((CachedImage?) -> Void)?) {
+    private func updatePDFControls(_ item: ViewerItem) {
+        let isPDF = (item.name as NSString).pathExtension.lowercased() == "pdf"
+        pdfGroup.isHidden = !isPDF
+        guard isPDF else { return }
+        pdfLabel.stringValue = pdfPageCount > 0 ? "\(pdfPage + 1) / \(pdfPageCount)" : ""
+        guard pdfPageCount == 0 else { return }
+        let current = generation
+        item.fetch { [weak self] url in
+            guard let self, let url, current == self.generation else { return }
+            self.pdfPageCount = ImageOps.pdfPageCount(url)
+            self.pdfLabel.stringValue = "\(self.pdfPage + 1) / \(self.pdfPageCount)"
+        }
+    }
+
+    private func load(position: Int, page: Int = 0, completion: ((CachedImage?) -> Void)?) {
         let item = items[position]
-        if let cached = cache.object(forKey: item.name as NSString) {
+        let key = cacheKey(item.name, page: page)
+        if let cached = cache.object(forKey: key) {
             completion?(cached)
             return
         }
@@ -226,11 +420,11 @@ final class ImageViewerController: NSWindowController, NSWindowDelegate {
             guard let self, let url else { completion?(nil); return }
             let maxPixels = self.maxPixels
             self.decodeQueue.async {
-                let decoded = ImageDecoder.decode(url, maxPixels: maxPixels)
+                let decoded = ImageDecoder.decode(url, maxPixels: maxPixels, pdfPage: page)
                 DispatchQueue.main.async {
                     guard let decoded else { completion?(nil); return }
                     let cached = CachedImage(image: decoded.image, pixelSize: decoded.pixelSize)
-                    self.cache.setObject(cached, forKey: item.name as NSString)
+                    self.cache.setObject(cached, forKey: key)
                     completion?(cached)
                 }
             }
@@ -239,51 +433,138 @@ final class ImageViewerController: NSWindowController, NSWindowDelegate {
 
     private func present(_ cached: CachedImage, for item: ViewerItem) {
         imageView.image = cached.image
+        displayPixels = cached.pixelSize.width > 0 ? cached.pixelSize : cached.image.size
+        fitWindowOnce()
         layoutImage()
-        updateTitle(item, pixelSize: cached.pixelSize)
+        refreshTitle()
     }
 
-    private func updateTitle(_ item: ViewerItem, pixelSize: NSSize) {
-        let zoomText = zoom == 1 ? L10n.t("viewer.fit") : "\(Int(zoom * 100))%"
-        window?.title = "\(item.name) — \(index + 1) / \(items.count) — \(Int(pixelSize.width))×\(Int(pixelSize.height)) — \(Format.size(item.size)) — \(zoomText)"
+    /// The window takes the picture's size the first time, up to the screen, and is left alone after that.
+    private func fitWindowOnce() {
+        guard !didFitWindow, let window, let screen = (window.screen ?? NSScreen.main)?.visibleFrame else { return }
+        didFitWindow = true
+        let chrome = window.frame.height - scroll.frame.height
+        let width = min(screen.width, max(window.frame.width, displayPixels.width))
+        let height = min(screen.height, max(window.frame.height, displayPixels.height + chrome + 2))
+        var frame = NSRect(x: 0, y: 0, width: width, height: height)
+        frame.origin = NSPoint(x: screen.midX - width / 2, y: screen.midY - height / 2)
+        window.setFrame(frame, display: true)
+        window.contentView?.layoutSubtreeIfNeeded()
     }
 
-    private func layoutImage() {
-        guard let image = imageView.image else { return }
+    /// Below 100% only when the picture does not fit. A small picture stays small until you zoom in.
+    private var scaleToShow: CGFloat {
         let available = scroll.contentSize
-        guard image.size.width > 0, image.size.height > 0, available.width > 0 else { return }
-        let fit = min(available.width / image.size.width, available.height / image.size.height)
-        imageView.frame = NSRect(x: 0, y: 0, width: image.size.width * fit * zoom, height: image.size.height * fit * zoom)
+        guard displayPixels.width > 0, displayPixels.height > 0, available.width > 0, available.height > 0 else { return 1 }
+        return min(1, min(available.width / displayPixels.width, available.height / displayPixels.height)) * zoom
+    }
+
+    func refreshTitle() {
+        guard items.indices.contains(index) else { return }
+        let item = items[index]
+        let size = "\(Int(displayPixels.width))×\(Int(displayPixels.height))"
+        window?.title = "\(item.name) — \(index + 1) / \(items.count) — \(size) — \(Format.size(item.size)) — \(Int((scaleToShow * 100).rounded()))%"
+    }
+
+    func layoutImage() {
+        guard imageView.image != nil, displayPixels.width > 0 else { return }
+        let scale = scaleToShow
+        imageView.frame = NSRect(x: 0, y: 0, width: (displayPixels.width * scale).rounded(), height: (displayPixels.height * scale).rounded())
+        overlay.frame = imageView.bounds
+        overlay.needsDisplay = true
     }
 
     private func setZoom(_ value: CGFloat) {
-        zoom = max(0.5, min(8, value))
+        zoom = max(0.1, min(16, value))
         layoutImage()
-        let item = items[index]
-        if let cached = cache.object(forKey: item.name as NSString) { updateTitle(item, pixelSize: cached.pixelSize) }
+        refreshTitle()
     }
 
     func windowDidResize(_ notification: Notification) { layoutImage() }
 
-    func windowWillClose(_ notification: Notification) { onClosed?() }
+    func windowWillClose(_ notification: Notification) {
+        cancelTool()
+        OpenDocuments.remove(self)
+        onClosed?()
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard isDirty else { return true }
+        askToDiscard { [weak self] fine in
+            guard fine, let self else { return }
+            self.markClean()
+            self.window?.close()
+        }
+        return false
+    }
+
+    var isDirty: Bool { session?.isDirty ?? false }
+    func markClean() { session?.markSaved() }
+
+    func askToDiscard(_ answer: @escaping (Bool) -> Void) {
+        let alert = NSAlert()
+        alert.messageText = L10n.t("image.unsavedTitle", items[index].name)
+        alert.informativeText = L10n.t("image.unsavedText")
+        alert.addButton(withTitle: L10n.t("image.discard"))
+        alert.addButton(withTitle: L10n.t("common.cancel"))
+        alert.buttons[0].hasDestructiveAction = true
+        guard let window else {
+            answer(alert.runModal() == .alertFirstButtonReturn)
+            return
+        }
+        window.makeKeyAndOrderFront(nil)
+        alert.beginSheetModal(for: window) { answer($0 == .alertFirstButtonReturn) }
+    }
+
+    private func escapePressed() {
+        if overlay.mode != .off {
+            cancelTool()
+        } else {
+            window?.performClose(nil)
+        }
+    }
 
     private func handleKey(_ event: NSEvent) -> Bool {
+        let command = event.modifierFlags.contains(.command)
+        let letter = event.charactersIgnoringModifiers?.lowercased()
+        if command {
+            switch letter {
+            case "s": saveAsClicked()
+            case "z": event.modifierFlags.contains(.shift) ? redoClicked() : undoClicked()
+            default: return false
+            }
+            return true
+        }
+        if overlay.mode != .off {
+            switch event.keyCode {
+            case 36, 76: applyTool()
+            case 53: cancelTool()
+            default: return false
+            }
+            return true
+        }
         switch event.keyCode {
         case 53, 99: // Esc, F3
-            close()
+            window?.performClose(nil)
         case 118: // F4
             onEdit?(index)
         case 124, 125, 121, 49: // right, down, page down, space
-            show(index: index + 1)
+            navigate(to: index + 1)
         case 123, 126, 116: // left, up, page up
-            show(index: index - 1)
-        case 115: show(index: 0)
-        case 119: show(index: items.count - 1)
+            navigate(to: index - 1)
+        case 115: navigate(to: 0)
+        case 119: navigate(to: items.count - 1)
         default:
-            switch event.charactersIgnoringModifiers {
+            switch letter {
             case "+", "=": setZoom(zoom * 1.25)
             case "-": setZoom(zoom / 1.25)
             case "0": setZoom(1)
+            case "c": cropClicked()
+            case "r": resizeClicked()
+            case "k": canvasClicked()
+            case "t": textClicked()
+            case "[": rotateLeftClicked()
+            case "]": rotateRightClicked()
             default: return false
             }
         }
