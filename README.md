@@ -51,7 +51,7 @@ Pictures open at their real size. Crop, change the image or canvas size, rotate,
 
 ### Compare files
 
-Two files side by side and lined up, with changed, added and removed lines in color.
+Two files side by side and lined up, with changed, added and removed lines in color. Each side shows its size and date, and says which file is newer.
 
 ![Two versions of a file compared](docs/images/compare.jpg)
 

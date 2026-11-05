@@ -35,8 +35,6 @@
 "status.marked" = "%@ / %@ işaretli · %@";
 "status.downloading" = "%@ indiriliyor…";
 
-"key.mark" = "İşaretle";
-"key.panel" = "Panel";
 "key.size" = "Boyut";
 "key.view" = "Görüntüle";
 "key.edit" = "Düzenle";
@@ -418,3 +416,8 @@
 "menu.sortSize" = "Boyuta Göre Sırala";
 "menu.sortDate" = "Tarihe Göre Sırala";
 "menu.pathBox" = "Yol Kutusuna Git";
+
+"compare.newer" = "Daha yeni";
+"compare.older" = "Daha eski";
+"compare.sameDate" = "Tarih aynı";
+"compare.newerFile" = "Daha yeni: %@.";

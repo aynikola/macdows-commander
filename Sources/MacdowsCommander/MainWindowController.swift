@@ -174,8 +174,6 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
 
         let definitions: [(String, String, Selector)] = [
             ("F1", "key.favorites", #selector(favoritesClicked)),
-            ("Ins", "key.mark", #selector(markClicked)),
-            ("Tab", "key.panel", #selector(switchPanelClicked)),
             ("F2", "key.same", #selector(mirrorClicked(_:))),
             ("⌃Q", "key.size", #selector(sizeClicked)),
             ("F3", "key.view", #selector(viewClicked)),
@@ -424,8 +422,6 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
     // MARK: Button and menu actions
 
     @objc private func favoritesClicked() { showFavoritesMenu() }
-    @objc private func markClicked() { active.toggleMark(at: active.table.selectedRow, advance: true) }
-    @objc private func switchPanelClicked() { activate(other) }
     @objc private func sizeClicked() { showInfo() }
     @objc private func viewClicked() { showPreview() }
     @objc private func editClicked() { edit(forceChoice: false) }
@@ -1151,9 +1147,19 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
                         guard let self else { return }
                         switch result {
                         case .failed(let message): self.showError(message)
-                        case .binary(let message): self.showToast(message)
+                        case .binary(let message):
+                            // Without a window to show them in, the toast says which file is newer.
+                            let (a, b) = (pair.first.0, pair.second.0)
+                            var text = message
+                            switch CompareWindowController.age(of: a.date, against: b.date) {
+                            case .newer: text += " " + L10n.t("compare.newerFile", firstName)
+                            case .older: text += " " + L10n.t("compare.newerFile", secondName)
+                            case .same: text += " " + L10n.t("compare.sameDate") + "."
+                            case .unknown: break
+                            }
+                            self.showToast(text)
                         case .text(let a, let b, let differ):
-                            let window = CompareWindowController(left: .init(title: firstName, text: a), right: .init(title: secondName, text: b), bytesDiffer: differ)
+                            let window = CompareWindowController(left: .init(title: firstName, text: a, size: pair.first.0.size, date: pair.first.0.date), right: .init(title: secondName, text: b, size: pair.second.0.size, date: pair.second.0.date), bytesDiffer: differ)
                             window.showWindow(nil)
                             self.onCompared?(window)
                         }

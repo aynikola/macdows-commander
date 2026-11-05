@@ -6,6 +6,31 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate {
     struct Side {
         let title: String
         let text: String
+        var size: Int64 = 0
+        var date: Date? = nil
+    }
+
+    enum Age: Equatable { case newer, older, same, unknown }
+
+    /// How the first date compares with the second. A file without a date can't be called newer.
+    static func age(of first: Date?, against second: Date?) -> Age {
+        guard let first, let second else { return .unknown }
+        // Servers often round to the second or the minute, so a hair's difference isn't an age.
+        if abs(first.timeIntervalSince(second)) < 1 { return .same }
+        return first > second ? .newer : .older
+    }
+
+    /// The line under a file's name: its size, its date and how old it is next to the other file.
+    static func details(of side: Side, against other: Side) -> String {
+        var parts = [Format.size(side.size)]
+        if side.date != nil { parts.append(Format.date(side.date)) }
+        switch age(of: side.date, against: other.date) {
+        case .newer: parts.append(L10n.t("compare.newer"))
+        case .older: parts.append(L10n.t("compare.older"))
+        case .same: parts.append(L10n.t("compare.sameDate"))
+        case .unknown: break
+        }
+        return parts.joined(separator: " · ")
     }
 
     private static var open: [CompareWindowController] = []
@@ -19,6 +44,8 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate {
     private let leftScroll = NSScrollView()
     private let rightScroll = NSScrollView()
     private let summary = NSTextField(labelWithString: "")
+    private(set) lazy var leftDetails = NSTextField(labelWithString: Self.details(of: left, against: right))
+    private(set) lazy var rightDetails = NSTextField(labelWithString: Self.details(of: right, against: left))
     private let ignoreSpace = NSButton(checkboxWithTitle: L10n.t("compare.ignoreSpace"), target: nil, action: nil)
     private var isSyncing = false
     private(set) var rows: [DiffRow] = []
@@ -107,11 +134,21 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate {
         let titles = NSStackView(views: [leftTitle, rightTitle])
         titles.distribution = .fillEqually
         titles.spacing = 2
-        titles.edgeInsets = NSEdgeInsets(top: 2, left: 8, bottom: 4, right: 8)
+        titles.edgeInsets = NSEdgeInsets(top: 2, left: 8, bottom: 0, right: 8)
+        let isNewer = { (side: Side, other: Side) in Self.age(of: side.date, against: other.date) == .newer }
+        for (label, newer) in [(leftDetails, isNewer(left, right)), (rightDetails, isNewer(right, left))] {
+            label.font = AppFont.interface(12, bold: newer)
+            label.textColor = newer ? Theme.success : Theme.secondaryText
+            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        }
+        let details = NSStackView(views: [leftDetails, rightDetails])
+        details.distribution = .fillEqually
+        details.spacing = 2
+        details.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 4, right: 8)
         let panes = NSStackView(views: [leftScroll, rightScroll])
         panes.distribution = .fillEqually
         panes.spacing = 2
-        for view in [bar, titles, panes] as [NSView] {
+        for view in [bar, titles, details, panes] as [NSView] {
             view.translatesAutoresizingMaskIntoConstraints = false
             content.addSubview(view)
             view.leadingAnchor.constraint(equalTo: content.leadingAnchor).isActive = true
@@ -120,7 +157,8 @@ final class CompareWindowController: NSWindowController, NSWindowDelegate {
         NSLayoutConstraint.activate([
             bar.topAnchor.constraint(equalTo: content.topAnchor),
             titles.topAnchor.constraint(equalTo: bar.bottomAnchor),
-            panes.topAnchor.constraint(equalTo: titles.bottomAnchor),
+            details.topAnchor.constraint(equalTo: titles.bottomAnchor),
+            panes.topAnchor.constraint(equalTo: details.bottomAnchor),
             panes.bottomAnchor.constraint(equalTo: content.bottomAnchor),
         ])
     }

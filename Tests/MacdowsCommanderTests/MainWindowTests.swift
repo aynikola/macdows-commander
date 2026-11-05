@@ -232,6 +232,23 @@ final class MainWindowTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: path, encoding: .utf8), "dolu")
     }
 
+    func testCompareSaysWhichFileIsNewer() {
+        let old = Date(timeIntervalSince1970: 1000), new = Date(timeIntervalSince1970: 5000)
+        XCTAssertEqual(CompareWindowController.age(of: new, against: old), .newer)
+        XCTAssertEqual(CompareWindowController.age(of: old, against: new), .older)
+        XCTAssertEqual(CompareWindowController.age(of: old, against: old.addingTimeInterval(0.5)), .same)
+        XCTAssertEqual(CompareWindowController.age(of: nil, against: new), .unknown)
+        XCTAssertEqual(CompareWindowController.age(of: new, against: nil), .unknown)
+        let a = CompareWindowController.Side(title: "a", text: "x", size: 2048, date: new)
+        let b = CompareWindowController.Side(title: "b", text: "y", size: 10, date: old)
+        let window = CompareWindowController(left: a, right: b, bytesDiffer: true)
+        XCTAssertTrue(window.leftDetails.stringValue.contains(Format.size(2048)))
+        XCTAssertTrue(window.leftDetails.stringValue.contains(Format.date(new)))
+        XCTAssertTrue(window.leftDetails.stringValue.hasSuffix(L10n.t("compare.newer")))
+        XCTAssertTrue(window.rightDetails.stringValue.hasSuffix(L10n.t("compare.older")))
+        window.close()
+    }
+
     func testCompareTakesTheSameNameInTheOtherPanel() throws {
         let other = root.appendingPathComponent("karsi")
         try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)

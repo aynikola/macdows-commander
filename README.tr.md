@@ -51,7 +51,7 @@ Resimler gerçek boyutunda açılır. Kırpma, resim ve tuval boyutu, döndürme
 
 ### Dosya karşılaştırma
 
-İki dosya yan yana ve hizalı; değişen, eklenen ve silinen satırlar renkli.
+İki dosya yan yana ve hizalı; değişen, eklenen ve silinen satırlar renkli. Her tarafta boyut ve tarih yazar, hangi dosyanın daha yeni olduğu görünür.
 
 ![Bir dosyanın iki sürümü karşılaştırılıyor](docs/images/compare.jpg)
 

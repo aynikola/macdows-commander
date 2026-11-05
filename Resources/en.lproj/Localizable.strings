@@ -35,8 +35,6 @@
 "status.marked" = "%@ / %@ marked · %@";
 "status.downloading" = "Downloading %@…";
 
-"key.mark" = "Mark";
-"key.panel" = "Panel";
 "key.size" = "Size";
 "key.view" = "View";
 "key.edit" = "Edit";
@@ -418,3 +416,8 @@
 "menu.sortSize" = "Sort by Size";
 "menu.sortDate" = "Sort by Date";
 "menu.pathBox" = "Go to Path Box";
+
+"compare.newer" = "Newer";
+"compare.older" = "Older";
+"compare.sameDate" = "Same date";
+"compare.newerFile" = "Newer: %@.";
