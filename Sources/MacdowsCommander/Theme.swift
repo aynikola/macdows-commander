@@ -7,22 +7,22 @@ extension Notification.Name {
 /// The app's colors. Each one follows the window's appearance, so changing the theme needs no restart.
 enum Theme {
     enum Choice: String, CaseIterable {
-        case cream, dark, original, system
+        case defaultDark, light, cream, norton
 
-        var titleKey: String {
-            switch self {
-            case .cream: return "menu.themeCream"
-            case .dark: return "menu.themeDark"
-            case .original: return "menu.themeOriginal"
-            case .system: return "menu.themeSystem"
-            }
-        }
+        var titleKey: String { "menu.theme.\(rawValue)" }
 
         fileprivate var appearance: NSAppearance? {
             switch self {
-            case .cream: return NSAppearance(named: .aqua)
-            case .dark, .original: return NSAppearance(named: .darkAqua)
-            case .system: return nil
+            case .cream, .light: return NSAppearance(named: .aqua)
+            case .defaultDark, .norton: return NSAppearance(named: .darkAqua)
+            }
+        }
+
+        /// Reads what was saved, including the names older versions used.
+        fileprivate init(saved: String?) {
+            switch saved {
+            case "dark", "original", "system": self = .defaultDark
+            default: self = saved.flatMap(Choice.init(rawValue:)) ?? .cream
             }
         }
     }
@@ -30,9 +30,8 @@ enum Theme {
     private static let choiceKey = "theme"
 
     /// Colors ask for this on every draw, so it stays in memory.
-    private static var current = UserDefaults.standard.string(forKey: choiceKey).flatMap(Choice.init(rawValue:)) ?? .cream
+    private static var current = Choice(saved: UserDefaults.standard.string(forKey: choiceKey))
 
-    /// Fixed colors, not system ones: a system color inside these can come out for the wrong appearance.
     static var choice: Choice {
         get { current }
         set {
@@ -45,57 +44,65 @@ enum Theme {
 
     /// Windows have no appearance of their own, so they all follow this.
     static func activate() {
-        NSApp.appearance = choice.appearance
+        NSApp.appearance = current.appearance
     }
 
     private static func rgb(_ value: Int, alpha: CGFloat = 1) -> NSColor {
         NSColor(srgbRed: CGFloat(value >> 16 & 255) / 255, green: CGFloat(value >> 8 & 255) / 255, blue: CGFloat(value & 255) / 255, alpha: alpha)
     }
 
-    /// The colors for cream, dark, and the app's original look.
-    static func colors(_ light: NSColor, _ dark: NSColor, original: NSColor) -> NSColor {
-        NSColor(name: nil) { appearance in
-            if choice == .original { return original }
-            return appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
+    /// Fixed colors, not system ones: a system color inside these can come out for the wrong appearance.
+    private static func colors(_ cream: Int, _ light: Int, _ dark: Int, _ norton: Int, alpha: CGFloat = 1) -> NSColor {
+        let values = (rgb(cream, alpha: alpha), rgb(light, alpha: alpha), rgb(dark, alpha: alpha), rgb(norton, alpha: alpha))
+        return NSColor(name: nil) { _ in
+            switch current {
+            case .cream: return values.0
+            case .light: return values.1
+            case .defaultDark: return values.2
+            case .norton: return values.3
+            }
         }
     }
 
-    static func hex(_ light: Int, _ dark: Int, original: Int) -> NSColor {
-        colors(rgb(light), rgb(dark), original: rgb(original))
-    }
+    /// A code color. Cream and light share one, since both are pale backgrounds.
+    static func token(_ pale: Int, dark: Int, norton: Int) -> NSColor { colors(pale, pale, dark, norton) }
 
-    private static func white(_ value: CGFloat, alpha: CGFloat = 1) -> NSColor { NSColor(white: value, alpha: alpha) }
-
-    static let background = colors(rgb(0xF6F2E7), rgb(0x262624), original: rgb(0x2B2B2B))
-    static let surface = colors(rgb(0xECE7D9), rgb(0x30302E), original: rgb(0x1E1E1E))
-    static let selectionMuted = colors(rgb(0xE2DCCB), rgb(0x3D3D3A), original: rgb(0x464646))
-    static let border = colors(rgb(0xD6D0BE), rgb(0x4A4A46), original: rgb(0x4A4A4A))
-    static let text = colors(rgb(0x3D3D3A), rgb(0xECEAE2), original: .white)
-    static let secondaryText = colors(rgb(0x73726C), rgb(0xB0AEA5), original: rgb(0xA6A6A6))
-    static let hiddenText = colors(rgb(0x8F8D84), rgb(0x8A8880), original: white(1, alpha: 0.65))
-    static let accent = colors(rgb(0xC6613F), rgb(0xD97757), original: rgb(0x0A84FF))
-    static let onAccent = colors(rgb(0xFFFFFF), rgb(0x1F1E1D), original: .white)
-    static let marked = colors(rgb(0xB5401A), rgb(0xFF9A6B), original: rgb(0xFF9F0A))
-    static let markedOnAccent = colors(rgb(0xFFE3B8), rgb(0x3A0E00), original: NSColor(red: 1, green: 0.85, blue: 0.56, alpha: 1))
-    static let error = colors(rgb(0xC62F2F), rgb(0xFF7B72), original: NSColor(red: 1, green: 0.36, blue: 0.36, alpha: 1))
-    static let success = colors(rgb(0x2F7D4F), rgb(0x7FCB9A), original: rgb(0x32D74B))
-    static let warning = colors(rgb(0xC6613F), rgb(0xD97757), original: rgb(0xFF9F0A))
+    static let background = colors(0xF6F2E7, 0xFFFFFF, 0x2B2B2B, 0x0000AA)
+    static let surface = colors(0xECE7D9, 0xF2F2F2, 0x1E1E1E, 0x000080)
+    static let selectionMuted = colors(0xE2DCCB, 0xDCDCDC, 0x464646, 0x000080)
+    static let border = colors(0xD6D0BE, 0xD0D0D0, 0x4A4A4A, 0x5555FF)
+    static let text = colors(0x1F1E1C, 0x111111, 0xFFFFFF, 0x55FFFF)
+    static let secondaryText = colors(0x55544F, 0x5A5A5A, 0xA6A6A6, 0xC0C0FF)
+    static let hiddenText = colors(0x75736B, 0x8A8A8A, 0xA8A8A8, 0x9999FF)
+    static let accent = colors(0xC6613F, 0x0A63D6, 0x0A84FF, 0x00AAAA)
+    static let onAccent = colors(0xFFFFFF, 0xFFFFFF, 0xFFFFFF, 0x000000)
+    static let marked = colors(0xB5401A, 0xC4320A, 0xFF9F0A, 0xFFFF55)
+    static let markedOnAccent = colors(0xFFE3B8, 0xFFE3B8, 0xFFD98F, 0x0000AA)
+    static let error = colors(0xC62F2F, 0xC62F2F, 0xFF5C5C, 0xFF5555)
+    static let success = colors(0x2F7D4F, 0x1E7B3E, 0x32D74B, 0x55FF55)
+    static let warning = colors(0xC6613F, 0xB8650A, 0xFF9F0A, 0xFFFF55)
     /// A message over the panels stands out by being the opposite of the window.
-    static let toastBackground = colors(rgb(0x3D3D3A), rgb(0xECEAE2), original: white(0.16, alpha: 0.97))
-    static let toastText = colors(rgb(0xFFFFFF), rgb(0x1F1E1D), original: .white)
+    static let toastBackground = colors(0x1F1E1C, 0x222222, 0x292929, 0x00AAAA)
+    static let toastText = colors(0xFFFFFF, 0xFFFFFF, 0xFFFFFF, 0x000000)
 
-    static let terminalBackground = colors(rgb(0xF6F2E7), rgb(0x262624), original: white(0.09))
-    static let terminalText = colors(rgb(0x3D3D3A), rgb(0xECEAE2), original: white(0.9))
+    static let diffRemoved = colors(0xF6D5CC, 0xFBDAD6, 0x5A2E2E, 0x800000)
+    static let diffAdded = colors(0xD5E8C8, 0xD4F0D8, 0x2C4A32, 0x006000)
+    static let diffChanged = colors(0xF5E7B5, 0xFFF3C2, 0x46402A, 0x505000)
+    static let diffWord = colors(0xEBCB6E, 0xF5D76E, 0x7A6A2E, 0x808000)
+    static let diffEmpty = colors(0xE2DCCB, 0xEBEBEB, 0x262626, 0x000060)
 
-    static let editorBackground = colors(rgb(0xF6F2E7), rgb(0x262624), original: white(0.12))
-    static let editorText = colors(rgb(0x3D3D3A), rgb(0xECEAE2), original: white(0.88))
-    static let editorCaret = colors(rgb(0x3D3D3A), rgb(0xECEAE2), original: .white)
-    static let gutter = colors(rgb(0xECE7D9), rgb(0x30302E), original: white(0.15))
-    static let gutterText = colors(rgb(0x8F8D84), rgb(0x8A8880), original: white(0.5))
-    static let gutterCurrent = colors(rgb(0x3D3D3A), rgb(0xECEAE2), original: white(0.9))
-    static let textSelection = colors(rgb(0xF5D1B8), rgb(0x5A4033), original: NSColor(red: 0.2, green: 0.36, blue: 0.6, alpha: 1))
-    static let match = colors(NSColor(srgbRed: 0.95, green: 0.78, blue: 0.35, alpha: 0.45), rgb(0xB5892A, alpha: 0.45), original: NSColor(red: 0.95, green: 0.75, blue: 0.2, alpha: 0.3))
-    static let currentMatch = colors(rgb(0xF59A4D), rgb(0xB5602A), original: NSColor(red: 1, green: 0.6, blue: 0.1, alpha: 0.75))
+    static let terminalBackground = colors(0xF6F2E7, 0xFFFFFF, 0x171717, 0x000000)
+    static let terminalText = colors(0x1F1E1C, 0x111111, 0xE6E6E6, 0xC0C0C0)
+
+    static let editorBackground = colors(0xF6F2E7, 0xFFFFFF, 0x1F1F1F, 0x0000AA)
+    static let editorText = colors(0x1F1E1C, 0x111111, 0xE0E0E0, 0xFFFFFF)
+    static let editorCaret = colors(0x1F1E1C, 0x111111, 0xFFFFFF, 0xFFFF55)
+    static let gutter = colors(0xECE7D9, 0xF2F2F2, 0x262626, 0x000080)
+    static let gutterText = colors(0x75736B, 0x8A8A8A, 0x808080, 0x9999FF)
+    static let gutterCurrent = colors(0x1F1E1C, 0x111111, 0xE6E6E6, 0xFFFFFF)
+    static let textSelection = colors(0xF5D1B8, 0xBBD6FB, 0x335C99, 0x008080)
+    static let match = colors(0xF2C759, 0xFFE27A, 0xF2BF33, 0xAAAA00, alpha: 0.45)
+    static let currentMatch = colors(0xF59A4D, 0xFFB454, 0xB5602A, 0xAA5500)
 
     /// Layers and the terminal keep one fixed color, so they get the theme's color at this moment.
     static func resolved(_ color: NSColor) -> NSColor {

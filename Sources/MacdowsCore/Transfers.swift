@@ -25,6 +25,28 @@ public struct TransferPlan {
     public var sourceDirectories: [String] = []
     public var skipped: Set<String> = []
 
+    /// Sends one file to a new name in the same folder, leaving what is already there alone.
+    public mutating func rename(relative: String, to name: String) {
+        guard let index = files.firstIndex(where: { $0.relative == relative }) else { return }
+        files[index].destination = PathUtil.join(PathUtil.parent(files[index].destination), name)
+    }
+
+    /// True when another file of this transfer is already going to `path`.
+    public func isPlanned(destination path: String) -> Bool {
+        files.contains { $0.destination == path && !skipped.contains($0.relative) }
+    }
+
+    /// "a.txt" becomes "a (2).txt", or the first number free.
+    public static func freeName(for name: String, taken: Set<String>) -> String {
+        let stem = (name as NSString).deletingPathExtension, ext = (name as NSString).pathExtension
+        var number = 2
+        while true {
+            let candidate = ext.isEmpty ? "\(stem) (\(number))" : "\(stem) (\(number)).\(ext)"
+            if !taken.contains(candidate) { return candidate }
+            number += 1
+        }
+    }
+
     public mutating func applyPolicy(_ policy: OverwritePolicy) {
         switch policy {
         case .ask, .overwrite:

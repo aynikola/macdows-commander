@@ -7,6 +7,11 @@ final class PanelTableView: NSTableView {
     var onFocusChange: (() -> Void)?
     var onCommandClick: ((Int) -> Void)?
     var onRightClick: ((Int) -> Void)?
+    var onShiftClick: ((Int) -> Void)?
+    var onSelectAll: (() -> Void)?
+
+    /// ⌘A from the menu arrives here.
+    override func selectAll(_ sender: Any?) { onSelectAll?() }
 
     /// False keeps the muted color, for the panel without the keyboard.
     var isActivePanel = false
@@ -47,6 +52,12 @@ final class PanelTableView: NSTableView {
     override func mouseDown(with event: NSEvent) {
         if event.modifierFlags.contains(.control) {
             rightMouseDown(with: event)
+            return
+        }
+        if event.modifierFlags.contains(.shift) {
+            window?.makeFirstResponder(self)
+            let clicked = row(at: convert(event.locationInWindow, from: nil))
+            if clicked >= 0 { onShiftClick?(clicked) }
             return
         }
         if event.modifierFlags.contains(.command) {
@@ -198,6 +209,8 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         table.doubleAction = #selector(doubleClicked)
         table.onFocusChange = { [weak self] in self?.onActivate?() }
         table.onCommandClick = { [weak self] row in self?.toggleMark(at: row, advance: false) }
+        table.onShiftClick = { [weak self] row in self?.markRange(to: row) }
+        table.onSelectAll = { [weak self] in self?.markAll() }
         table.onRightClick = { [weak self] row in
             self?.moveCursor(to: row)
             self?.toggleMark(at: row, advance: false)
@@ -574,6 +587,26 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
     func goUp() {
         guard path != "/" else { return leaveArchive() }
         load(path: PathUtil.parent(path), select: PathUtil.lastComponent(path))
+    }
+
+    /// Shift+click: marks everything from the cursor to the clicked row, and the cursor moves there.
+    func markRange(to row: Int) {
+        guard row >= 0, row < rows.count else { return }
+        let start = table.selectedRow >= 0 ? table.selectedRow : row
+        for index in min(start, row)...max(start, row) where rows[index].name != ".." {
+            marked.insert(rows[index].name)
+        }
+        table.reloadData()
+        moveCursor(to: row)
+        updateStatus()
+    }
+
+    /// Ctrl+A or ⌘A: marks everything. Pressed again it clears the marks.
+    func markAll() {
+        let names = Set(rows.map(\.name).filter { $0 != ".." })
+        marked = marked == names ? [] : names
+        table.reloadData()
+        updateStatus()
     }
 
     func clearMarks() {

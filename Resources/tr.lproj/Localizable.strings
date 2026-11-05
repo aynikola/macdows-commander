@@ -229,10 +229,6 @@
 "menu.font" = "Font";
 "menu.fontSystem" = "Sistem";
 "menu.theme" = "Tema";
-"menu.themeCream" = "Krem";
-"menu.themeDark" = "Koyu";
-"menu.themeOriginal" = "İlk renkler";
-"menu.themeSystem" = "Sisteme uy";
 "edit.save" = "Kaydet ⌘S";
 "edit.dontSave" = "Kaydetme";
 "edit.find" = "Bul ⌃F";
@@ -364,3 +360,53 @@
 "rich.table.deleteColumn" = "Sütunu sil";
 "rich.table.deleteTable" = "Tabloyu sil";
 "rich.table.noCell" = "Önce imleci tablonun bir hücresine koyun.";
+
+"key.share" = "Paylaş";
+"menu.share" = "Paylaş…";
+"share.nothing" = "Paylaşılacak dosya yok.";
+"share.noRemoteFolders" = "Sunucudaki klasörler paylaşılamaz, dosyaları seçin.";
+
+"top.newFile" = "Yeni dosya ⇧F7";
+"menu.newFile" = "Yeni Dosya…";
+"newFile.title" = "Yeni dosyanın adı";
+"newFile.txt" = "Metin (.txt)";
+"newFile.html" = "HTML (.html)";
+"newFile.md" = "Markdown (.md)";
+"newFile.badName" = "Bu ad kullanılamaz.";
+"viewer.source" = "Kaynak";
+"viewer.page" = "Görünüm";
+"edit.saveAs" = "Farklı kaydet ⌘⇧S";
+"edit.saveAsTitle" = "Dosyanın yeni adı";
+"edit.saveAsConfirm" = "Kaydet";
+"edit.alreadyOpen" = "%@ başka bir editör penceresinde açık.";
+
+"top.mirror" = "Aynısını aç F2";
+"top.mirrorTip" = "Diğer panelde bu paneldeki klasörü açar";
+"top.compare" = "Karşılaştır ⌥F3";
+"menu.mirror" = "Diğer Panelde Aynısını Aç";
+"menu.compare" = "Dosyaları Karşılaştır";
+"mirror.archive" = "Arşivin içindeyken diğer panelde açılamaz.";
+"compare.choose" = "İki dosya işaretleyin veya imleci iki panelde birer dosyaya getirin.";
+"compare.ignoreSpace" = "Boşlukları yok say";
+"compare.previous" = "Önceki ⇧F3";
+"compare.next" = "Sonraki F3";
+"compare.same" = "Dosyalar aynı.";
+"compare.onlyEndings" = "Satırlar aynı; yalnızca satır sonu veya kodlama farklı.";
+"compare.count" = "%@ fark";
+"compare.position" = "Fark %@ / %@";
+"compare.cannotRead" = "Dosyalar okunamadı.";
+"compare.bytesSame" = "Dosyalar birebir aynı (%@).";
+"compare.bytesDiffer" = "Dosyalar farklı: ilk fark %@. baytta (%@ ve %@).";
+
+"menu.theme.defaultDark" = "Varsayılan koyu";
+"menu.theme.light" = "Açık";
+"menu.theme.cream" = "Krem";
+"menu.theme.norton" = "Norton / Windows Commander";
+"terminal.hints" = "İpuçları: Tab tamamlar · Yukarı ok: önceki komut · Ctrl+R: geçmişte ara\nCtrl+C: durdur · Ctrl+L: temizle · F9: panelin klasörüne git\nGit düğmeleri komutu yazar; add, commit, pull, push ve switch Enter bekler.";
+"terminal.gitWaits" = "Enter'a basınca çalışır";
+"rich.source" = "Kaynak ⌘⇧K";
+"edit.visual" = "Görsel düzenle";
+"conflict.rename" = "Yeniden adlandır (R)";
+"conflict.renameTitle" = "Kopyanın yeni adı";
+
+"key.same" = "Aynısını aç";

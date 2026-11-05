@@ -229,10 +229,6 @@
 "menu.font" = "Font";
 "menu.fontSystem" = "System";
 "menu.theme" = "Theme";
-"menu.themeCream" = "Cream";
-"menu.themeDark" = "Dark";
-"menu.themeOriginal" = "Original colors";
-"menu.themeSystem" = "Match the system";
 "edit.save" = "Save ⌘S";
 "edit.dontSave" = "Don't Save";
 "edit.find" = "Find ⌃F";
@@ -364,3 +360,53 @@
 "rich.table.deleteColumn" = "Delete column";
 "rich.table.deleteTable" = "Delete table";
 "rich.table.noCell" = "Put the cursor in a table cell first.";
+
+"key.share" = "Share";
+"menu.share" = "Share…";
+"share.nothing" = "There is nothing to share.";
+"share.noRemoteFolders" = "Folders on a server cannot be shared. Choose files instead.";
+
+"top.newFile" = "New file ⇧F7";
+"menu.newFile" = "New File…";
+"newFile.title" = "Name of the new file";
+"newFile.txt" = "Text (.txt)";
+"newFile.html" = "HTML (.html)";
+"newFile.md" = "Markdown (.md)";
+"newFile.badName" = "This name can't be used.";
+"viewer.source" = "Source";
+"viewer.page" = "Page";
+"edit.saveAs" = "Save as ⌘⇧S";
+"edit.saveAsTitle" = "New name of the file";
+"edit.saveAsConfirm" = "Save";
+"edit.alreadyOpen" = "%@ is open in another editor window.";
+
+"top.mirror" = "Open same F2";
+"top.mirrorTip" = "Opens this panel's folder in the other panel";
+"top.compare" = "Compare ⌥F3";
+"menu.mirror" = "Open Same in Other Panel";
+"menu.compare" = "Compare Files";
+"mirror.archive" = "An open archive can't be shown in the other panel.";
+"compare.choose" = "Mark two files, or put the cursor on a file in each panel.";
+"compare.ignoreSpace" = "Ignore spaces";
+"compare.previous" = "Previous ⇧F3";
+"compare.next" = "Next F3";
+"compare.same" = "The files are the same.";
+"compare.onlyEndings" = "The lines are the same. Only line endings or the encoding differ.";
+"compare.count" = "%@ differences";
+"compare.position" = "Difference %@ of %@";
+"compare.cannotRead" = "The files could not be read.";
+"compare.bytesSame" = "The files are identical (%@).";
+"compare.bytesDiffer" = "The files differ: first at byte %@ (%@ and %@).";
+
+"menu.theme.defaultDark" = "Default dark";
+"menu.theme.light" = "Light";
+"menu.theme.cream" = "Cream";
+"menu.theme.norton" = "Norton / Windows Commander";
+"terminal.hints" = "Tips: Tab completes · Up arrow: last command · Ctrl+R: search history\nCtrl+C: stop · Ctrl+L: clear · F9: go to the panel folder\nThe Git buttons type the command; add, commit, pull, push and switch wait for Enter.";
+"terminal.gitWaits" = "runs when you press Enter";
+"rich.source" = "Source ⌘⇧K";
+"edit.visual" = "Edit visually";
+"conflict.rename" = "Rename (R)";
+"conflict.renameTitle" = "New name for the copy";
+
+"key.same" = "Open same";

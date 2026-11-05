@@ -29,16 +29,16 @@ private enum EditorColors {
     /// Readable on the background of each theme.
     static func color(for kind: TokenKind) -> NSColor {
         switch kind {
-        case .comment: return Theme.hex(0x7A8450, 0x9AA66E, original: 0x7FA86F)
-        case .string: return Theme.hex(0xA8552C, 0xE3A27C, original: 0xE5A07B)
-        case .keyword: return Theme.hex(0x9A3E8C, 0xD79BD0, original: 0xD197D9)
-        case .number: return Theme.hex(0x2F7D4F, 0x7FCB9A, original: 0xB9DDA5)
-        case .tag: return Theme.hex(0x2B6CA3, 0x7DB8E8, original: 0x6DB3F2)
-        case .attribute: return Theme.hex(0x8A5A12, 0xE0B568, original: 0x9CDCFE)
-        case .variable: return Theme.hex(0x12788A, 0x6CC6D6, original: 0x7FD6F0)
-        case .function: return Theme.hex(0x6A4FB0, 0xB3A0F0, original: 0xE6DFA0)
-        case .meta: return Theme.hex(0xC6613F, 0xD97757, original: 0xFF8F8F)
-        case .regex: return Theme.hex(0xB5305F, 0xEE8FB0, original: 0xF08FA8)
+        case .comment: return Theme.token(0x7A8450, dark: 0x7FA86F, norton: 0x8FD0FF)
+        case .string: return Theme.token(0xA8552C, dark: 0xE5A07B, norton: 0xFFFF55)
+        case .keyword: return Theme.token(0x9A3E8C, dark: 0xD197D9, norton: 0xFF9FFF)
+        case .number: return Theme.token(0x2F7D4F, dark: 0xB9DDA5, norton: 0x55FF55)
+        case .tag: return Theme.token(0x2B6CA3, dark: 0x6DB3F2, norton: 0x55FFFF)
+        case .attribute: return Theme.token(0x8A5A12, dark: 0x9CDCFE, norton: 0xFFD27F)
+        case .variable: return Theme.token(0x12788A, dark: 0x7FD6F0, norton: 0x9FFFB0)
+        case .function: return Theme.token(0x6A4FB0, dark: 0xE6DFA0, norton: 0xFFFFAA)
+        case .meta: return Theme.token(0xC6613F, dark: 0xFF8F8F, norton: 0xFF7F7F)
+        case .regex: return Theme.token(0xB5305F, dark: 0xF08FA8, norton: 0xFFAAD0)
         }
     }
 }
@@ -136,10 +136,10 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSText
         openEditors.first { $0.target.path == path && $0.target.source === source }
     }
 
-    let target: Target
+    private(set) var target: Target
     private var file: EditorDocument
     private var stamp: Stamp?
-    let language: CodeLanguage
+    private(set) var language: CodeLanguage
     var onSaved: (() -> Void)?
     var onMessage: ((String) -> Void)?
     /// Asks before replacing a file that changed elsewhere. Replaced in tests.
@@ -150,6 +150,10 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSText
     private let ruler: LineNumberRuler
     private let storage = NSTextStorage()
     private let saveButton = NSButton()
+    private let saveAsButton = NSButton()
+    private let visualButton = NSButton()
+    /// Opens this file in the writing editor, with what the window holds.
+    var onOpenVisual: ((Target, EditorDocument, Stamp?) -> Void)?
     private let findButton = NSButton()
     private let replaceButton = NSButton()
     private let duplicateButton = NSButton()
@@ -283,12 +287,14 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSText
     private func build(in window: NSWindow) {
         guard let content = window.contentView else { return }
         toolbarButton(saveButton, #selector(saveClicked))
+        toolbarButton(saveAsButton, #selector(saveAsClicked))
+        toolbarButton(visualButton, #selector(visualClicked))
         toolbarButton(findButton, #selector(findClicked))
         toolbarButton(replaceButton, #selector(replaceClicked))
         toolbarButton(duplicateButton, #selector(duplicateClicked))
         toolbarButton(deleteButton, #selector(deleteClicked))
         toolbarButton(goToButton, #selector(goToClicked))
-        let toolbar = NSStackView(views: [saveButton, findButton, replaceButton, goToButton, duplicateButton, deleteButton, NSView()])
+        let toolbar = NSStackView(views: [saveButton, saveAsButton, visualButton, findButton, replaceButton, goToButton, duplicateButton, deleteButton, NSView()])
         toolbar.spacing = 6
         toolbar.edgeInsets = NSEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
 
@@ -377,6 +383,9 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSText
 
     private func relabel() {
         saveButton.title = L10n.t("edit.save")
+        saveAsButton.title = L10n.t("edit.saveAs")
+        visualButton.title = L10n.t("edit.visual")
+        refreshVisualButton()
         findButton.title = L10n.t("edit.find")
         replaceButton.title = L10n.t("edit.replace")
         duplicateButton.title = L10n.t("edit.duplicate")
@@ -455,6 +464,8 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSText
             moveMatch(forward: !shift)
         case "s" where !shift && !option:
             save()
+        case "s" where shift && !option:
+            saveAs()
         case "d" where !shift && !option:
             duplicateLines()
         case "l" where !shift && !option:
@@ -468,6 +479,25 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSText
     }
 
     @objc private func saveClicked() { save() }
+    @objc private func saveAsClicked() { saveAs() }
+
+    private func refreshVisualButton() {
+        visualButton.isHidden = !["html", "htm", "md", "markdown", "mdown", "mkd"].contains((target.name as NSString).pathExtension.lowercased())
+    }
+
+    /// Saves first if needed, because the writing editor works from the file as it stands.
+    @objc private func visualClicked() {
+        let open = { [weak self] in
+            guard let self else { return }
+            let current = EditorDocument(text: self.textView.string, encoding: self.file.encoding, usesCRLF: self.file.usesCRLF)
+            self.onOpenVisual?(self.target, current, self.stamp)
+        }
+        if isDirty {
+            save { if $0 { open() } }
+        } else {
+            open()
+        }
+    }
     @objc private func findClicked() { showFind(replacing: false) }
     @objc private func replaceClicked() { showFind(replacing: true) }
     @objc private func duplicateClicked() { duplicateLines() }
@@ -894,6 +924,123 @@ final class EditorWindowController: NSWindowController, NSWindowDelegate, NSText
             try data.write(to: url)
         }
         if let permissions { try? FileManager.default.setAttributes([.posixPermissions: permissions], ofItemAtPath: url.path) }
+    }
+
+    // MARK: Save as
+
+    /// Replaced in tests, where nobody can answer a panel. Gives the chosen path, already confirmed if it replaces a file.
+    var chooseSavePath: ((@escaping (String?) -> Void) -> Void)?
+
+    func saveAs(completion: ((Bool) -> Void)? = nil) {
+        guard !isSaving else {
+            completion?(false)
+            return
+        }
+        chooseNewPath { [weak self] path in
+            guard let self else { return }
+            guard let path else {
+                completion?(false)
+                return
+            }
+            self.write(to: path, completion: completion)
+        }
+    }
+
+    private func chooseNewPath(_ answer: @escaping (String?) -> Void) {
+        if let chooseSavePath {
+            chooseSavePath(answer)
+        } else if target.source == nil {
+            guard let window else { return answer(nil) }
+            let panel = NSSavePanel()
+            panel.directoryURL = URL(fileURLWithPath: (target.path as NSString).deletingLastPathComponent, isDirectory: true)
+            panel.nameFieldStringValue = target.name
+            panel.canCreateDirectories = true
+            panel.isExtensionHidden = false
+            // The panel itself asks before replacing a file.
+            panel.beginSheetModal(for: window) { answer($0 == .OK ? panel.url?.path : nil) }
+        } else {
+            askForRemotePath(answer)
+        }
+    }
+
+    /// A file on a server gets a new name in its folder: the Mac's save panel can't browse servers.
+    private func askForRemotePath(_ answer: @escaping (String?) -> Void) {
+        guard let window, let source = target.source else { return answer(nil) }
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        field.stringValue = target.name
+        let alert = NSAlert()
+        alert.messageText = L10n.t("edit.saveAsTitle")
+        alert.informativeText = (target.path as NSString).deletingLastPathComponent
+        alert.accessoryView = field
+        alert.addButton(withTitle: L10n.t("edit.saveAsConfirm"))
+        alert.addButton(withTitle: L10n.t("common.cancel")).keyEquivalent = "\u{1b}"
+        alert.window.initialFirstResponder = field
+        let folder = (target.path as NSString).deletingLastPathComponent
+        let queue = target.queue
+        alert.beginSheetModal(for: window) { [weak self] response in
+            let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard response == .alertFirstButtonReturn, !name.isEmpty, name != ".", name != "..", !name.contains("/") else { return answer(nil) }
+            let path = PathUtil.join(folder, name)
+            queue.async {
+                let exists = (try? source.list(folder))?.contains { $0.name == name } ?? false
+                DispatchQueue.main.async {
+                    guard exists, let self else { return answer(path) }
+                    self.showAlert(title: L10n.t("rich.existsTitle", name), text: L10n.t("edit.changedText"), buttons: [L10n.t("edit.overwrite"), L10n.t("common.cancel")], cancelIndex: 1, safeDefault: true) {
+                        answer($0 == 0 ? path : nil)
+                    }
+                }
+            }
+        }
+    }
+
+    private func write(to path: String, completion: ((Bool) -> Void)?) {
+        if Self.existing(path: path, source: target.source).map({ $0 !== self }) == true {
+            showAlert(title: L10n.t("edit.alreadyOpen", (path as NSString).lastPathComponent), text: "", buttons: [L10n.t("common.ok")]) { _ in }
+            completion?(false)
+            return
+        }
+        guard let data = file.encode(textView.string) else {
+            askToConvert { [weak self] convert in
+                guard let self else { return }
+                if convert {
+                    self.file.encoding = .utf8
+                    self.refreshStatus()
+                    self.write(to: path, completion: completion)
+                } else {
+                    completion?(false)
+                }
+            }
+            return
+        }
+        isSaving = true
+        let revision = changeCount
+        let newTarget = Target(name: (path as NSString).lastPathComponent, path: path, source: target.source, queue: target.queue)
+        // The choice to replace is made by now, so this writes without comparing to the old file.
+        Self.guardedWrite(data, target: newTarget, baseline: nil, ask: { $0(true) }, completion: { [weak self] outcome in
+            guard let self else { return }
+            self.isSaving = false
+            switch outcome {
+            case .saved(let newStamp):
+                // From here on the window edits the new file, and the old one stays as it was.
+                self.target = newTarget
+                self.stamp = newStamp
+                if self.changeCount == revision { self.isDirty = false }
+                self.language = CodeLanguage.detect(fileName: newTarget.name)
+                self.refreshVisualButton()
+                self.updateTitle()
+                self.analyze()
+                self.scheduleCheck(delay: 0)
+                self.refreshStatus()
+                self.onSaved?()
+                if newTarget.source != nil { self.onMessage?(L10n.t("editor.uploaded", newTarget.name)) }
+                completion?(true)
+            case .declined:
+                completion?(false)
+            case .failed(let error):
+                self.showAlert(title: L10n.t("edit.saveFailed", newTarget.name), text: error.localizedDescription, buttons: [L10n.t("common.ok")]) { _ in }
+                completion?(false)
+            }
+        })
     }
 
     func save(completion: ((Bool) -> Void)? = nil) {

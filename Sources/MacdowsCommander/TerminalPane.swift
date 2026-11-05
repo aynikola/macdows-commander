@@ -16,6 +16,7 @@ final class TerminalSession: LocalProcessTerminalViewDelegate {
     private(set) var isRunning = false
     private(set) var directory: String
     var onTerminated: ((TerminalSession) -> Void)?
+    var onDirectoryChange: (() -> Void)?
 
     init(target: TerminalTarget, directory: String) {
         self.target = target
@@ -61,6 +62,20 @@ final class TerminalSession: LocalProcessTerminalViewDelegate {
         view.startProcess(executable: "/usr/bin/ssh", args: invocation.arguments, environment: Self.environment(extra: invocation.environment), execName: "ssh")
     }
 
+    /// Types a command at the prompt. `run` false leaves it there for Enter, and `back` puts the cursor that far from its end.
+    @discardableResult
+    func type(_ command: String, run: Bool, back: Int = 0) -> Bool {
+        guard isRunning, !view.getTerminal().isCurrentBufferAlternate else { return false }
+        view.send(txt: "\u{05}\u{15}" + command + (run ? "\r" : String(repeating: "\u{1b}[D", count: back)))
+        return true
+    }
+
+    /// Shown once when a session starts, before the shell's first prompt.
+    func showHints() {
+        let lines = L10n.t("terminal.hints").components(separatedBy: "\n")
+        view.feed(text: lines.map { "\u{1b}[2m\($0)\u{1b}[0m\r\n" }.joined() + "\r\n")
+    }
+
     func stop() {
         guard isRunning else { return }
         // Interactive shells ignore SIGTERM, so hang up the way closing a terminal window does.
@@ -77,6 +92,7 @@ final class TerminalSession: LocalProcessTerminalViewDelegate {
     func changeDirectory(_ path: String) {
         guard isRunning, path != directory, !view.getTerminal().isCurrentBufferAlternate else { return }
         directory = path
+        onDirectoryChange?()
         // Ctrl-E Ctrl-U clears half-typed text, so it can't run together with the cd.
         view.send(txt: "\u{05}\u{15} cd \(SSHClient.shellQuote(path))\r")
     }
@@ -111,6 +127,8 @@ final class TerminalPane: NSView {
     private let hintLabel = NSTextField(labelWithString: "")
     private let closeButton = NSButton()
     private let holder = NSView()
+    private let gitLabel = NSTextField(labelWithString: "Git")
+    private let gitBar = NSStackView()
     private var sessions: [TerminalTarget: TerminalSession] = [:]
     private var titles: [TerminalTarget: String] = [:]
     private(set) var current: TerminalSession?
@@ -142,7 +160,8 @@ final class TerminalPane: NSView {
         header.addSubview(row)
         header.onDrag = { [weak self] delta in self?.onResize?(delta) }
 
-        [header, holder].forEach {
+        buildGitBar()
+        [header, gitBar, holder].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             addSubview($0)
         }
@@ -154,7 +173,10 @@ final class TerminalPane: NSView {
             row.centerYAnchor.constraint(equalTo: header.centerYAnchor),
             row.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 10),
             row.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -6),
-            holder.topAnchor.constraint(equalTo: header.bottomAnchor),
+            gitBar.topAnchor.constraint(equalTo: header.bottomAnchor),
+            gitBar.leadingAnchor.constraint(equalTo: leadingAnchor),
+            gitBar.trailingAnchor.constraint(equalTo: trailingAnchor),
+            holder.topAnchor.constraint(equalTo: gitBar.bottomAnchor),
             holder.leadingAnchor.constraint(equalTo: leadingAnchor),
             holder.trailingAnchor.constraint(equalTo: trailingAnchor),
             holder.bottomAnchor.constraint(equalTo: bottomAnchor),
@@ -165,6 +187,70 @@ final class TerminalPane: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError("Not used") }
+
+    /// Commands that only look run at once. Those that change something wait at the prompt for Enter.
+    static let gitCommands: [(title: String, command: String, run: Bool, back: Int)] = [
+        ("status", "git status", true, 0),
+        ("diff", "git diff", true, 0),
+        ("log", "git log --oneline -20", true, 0),
+        ("branch", "git branch -a", true, 0),
+        ("add .", "git add .", false, 0),
+        ("commit", "git commit -m \"\"", false, 1),
+        ("pull", "git pull", false, 0),
+        ("push", "git push", false, 0),
+        ("switch", "git switch ", false, 0),
+    ]
+
+    private func buildGitBar() {
+        gitLabel.font = AppFont.interface(11, bold: true)
+        gitLabel.textColor = .secondaryLabelColor
+        gitBar.addArrangedSubview(gitLabel)
+        for (index, git) in Self.gitCommands.enumerated() {
+            let button = NSButton(title: git.title, target: self, action: #selector(gitClicked(_:)))
+            button.tag = index
+            button.bezelStyle = .rounded
+            button.controlSize = .small
+            button.font = AppFont.interface(11)
+            button.refusesFirstResponder = true
+            button.toolTip = git.command + (git.run ? "" : " · " + L10n.t("terminal.gitWaits"))
+            gitBar.addArrangedSubview(button)
+        }
+        gitBar.addArrangedSubview(NSView())
+        gitBar.spacing = 4
+        gitBar.edgeInsets = NSEdgeInsets(top: 2, left: 10, bottom: 4, right: 6)
+    }
+
+    @objc private func gitClicked(_ sender: NSButton) {
+        guard let current else { return }
+        let git = Self.gitCommands[sender.tag]
+        if !current.type(git.command, run: git.run, back: git.back) { NSSound.beep() }
+        window?.makeFirstResponder(current.view)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.refreshBranch() }
+    }
+
+    /// Shows the branch of a local shell's folder. A server's folder can't be asked from here.
+    func refreshBranch() {
+        guard let current, current.target == .local else {
+            gitLabel.stringValue = "Git"
+            return
+        }
+        let directory = current.directory
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            process.arguments = ["-C", directory, "branch", "--show-current"]
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = FileHandle.nullDevice
+            var branch = ""
+            if (try? process.run()) != nil {
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                if process.terminationStatus == 0 { branch = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) }
+            }
+            DispatchQueue.main.async { self?.gitLabel.stringValue = branch.isEmpty ? "Git" : "Git: \(branch)" }
+        }
+    }
 
     private func applyLayerColors() {
         layer?.backgroundColor = Theme.resolved(Theme.terminalBackground).cgColor
@@ -218,9 +304,12 @@ final class TerminalPane: NSView {
         }
         sessions[target]?.view.removeFromSuperview()
         sessions[target] = session
+        session.onDirectoryChange = { [weak self] in self?.refreshBranch() }
         display(session)
         window?.contentView?.layoutSubtreeIfNeeded()
+        session.showHints()
         start(session)
+        refreshBranch()
         updateTitle()
         return session
     }

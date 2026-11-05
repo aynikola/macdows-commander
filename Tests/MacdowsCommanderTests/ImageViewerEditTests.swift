@@ -52,6 +52,22 @@ final class ImageViewerEditTests: XCTestCase {
         spin("full picture") { ready }
     }
 
+    func testHTMLAndMarkdownOfferAPageViewAndOthersDoNot() throws {
+        XCTAssertNotNil(TextViewerController.pageHTML(fileName: "a.HTML", text: "<p>x</p>"))
+        XCTAssertTrue(TextViewerController.pageHTML(fileName: "a.md", text: "# x")?.contains("<h1>x</h1>") ?? false)
+        XCTAssertNil(TextViewerController.pageHTML(fileName: "a.txt", text: "x"))
+        XCTAssertNil(TextViewerController.pageHTML(fileName: "a.php", text: "x"))
+        UserDefaults.standard.removeObject(forKey: "viewer.showsPage")
+        let page = TextViewerController.PageView(html: "<p>x</p>", folder: folder.path, source: nil, queue: DispatchQueue(label: "t"))
+        let viewer = TextViewerController(name: "a.md", detail: "", text: "# x", pageView: page)
+        XCTAssertTrue(viewer.isShowingPage, "a page first")
+        viewer.show(page: false)
+        XCTAssertFalse(viewer.isShowingPage)
+        viewer.show(page: true)
+        XCTAssertTrue(viewer.isShowingPage)
+        viewer.close()
+    }
+
     func testASmallPictureIsNotBlownUp() throws {
         let viewer = viewer([try picture("small.png", width: 200, height: 120)])
         XCTAssertEqual(viewer.imageView.frame.size, NSSize(width: 200, height: 120))

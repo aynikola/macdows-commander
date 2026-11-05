@@ -31,6 +31,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     private let attributesButton = NSButton()
     private let newWindowButton = NSButton()
     private let searchButton = NSButton()
+    private let newFileButton = NSButton()
+    private let mirrorButton = NSButton()
+    private let compareButton = NSButton()
     private let packButton = NSButton()
     private let helpButton = NSButton()
     private let sshButton = NSButton()
@@ -133,10 +136,13 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         spacer.setContentHuggingPriority(.init(1), for: .horizontal)
         topButton(favoriteToggle, #selector(toggleFavoriteClicked))
         topButton(searchButton, #selector(showSearch(_:)))
+        topButton(newFileButton, #selector(newFileClicked(_:)))
+        topButton(mirrorButton, #selector(mirrorClicked(_:)))
+        topButton(compareButton, #selector(compareClicked(_:)))
         topButton(packButton, #selector(packClicked))
         topButton(helpButton, #selector(helpClicked))
         topButton(sshButton, #selector(showSSHMenu(_:)))
-        let top = NSStackView(views: [favoriteToggle, spacer, sshButton, helpButton, searchButton, packButton, hiddenButton, attributesButton, newWindowButton])
+        let top = NSStackView(views: [favoriteToggle, spacer, newFileButton, mirrorButton, compareButton, sshButton, helpButton, searchButton, packButton, hiddenButton, attributesButton, newWindowButton])
         top.translatesAutoresizingMaskIntoConstraints = false
         top.spacing = 6
         topBar = top
@@ -168,7 +174,8 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             ("F1", "key.favorites", #selector(favoritesClicked)),
             ("Ins", "key.mark", #selector(markClicked)),
             ("Tab", "key.panel", #selector(switchPanelClicked)),
-            ("F2", "key.size", #selector(sizeClicked)),
+            ("F2", "key.same", #selector(mirrorClicked(_:))),
+            ("⌃Q", "key.size", #selector(sizeClicked)),
             ("F3", "key.view", #selector(viewClicked)),
             ("F4", "key.edit", #selector(editClicked)),
             ("F5", "key.copy", #selector(copyClicked)),
@@ -177,6 +184,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             ("F8", "key.delete", #selector(deleteClicked)),
             ("F9", "key.terminal", #selector(terminalClicked)),
             ("F10", "key.write", #selector(writerClicked)),
+            ("F11", "key.share", #selector(shareClicked(_:))),
         ]
         var buttons: [NSButton] = []
         for (key, labelKey, action) in definitions {
@@ -264,7 +272,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     @objc private func languageChanged() { relabel() }
 
     @objc private func applyInterfaceFonts() {
-        for button in [hiddenButton, attributesButton, newWindowButton, favoriteToggle, searchButton, packButton, helpButton, sshButton, editorButton, clearButton, cancelButton] {
+        for button in [hiddenButton, attributesButton, newWindowButton, favoriteToggle, searchButton, newFileButton, mirrorButton, compareButton, packButton, helpButton, sshButton, editorButton, clearButton, cancelButton] {
             button.font = AppFont.interface(11)
         }
         functionButtons.forEach { $0.button.font = AppFont.interface(12) }
@@ -276,6 +284,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         attributesButton.title = L10n.t(active.showAttributes ? "top.attributesOn" : "top.attributesOff")
         newWindowButton.title = L10n.t("top.newWindow")
         searchButton.title = L10n.t("top.search")
+        newFileButton.title = L10n.t("top.newFile")
+        mirrorButton.title = L10n.t("top.mirror")
+        mirrorButton.toolTip = L10n.t("top.mirrorTip")
+        compareButton.title = L10n.t("top.compare")
         packButton.title = L10n.t("top.pack")
         helpButton.title = L10n.t("top.help")
         sshButton.title = L10n.t("top.ssh")
@@ -311,10 +323,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     }
 
     private var lastActive: PanelController?
-    private var active: PanelController { lastActive ?? left }
+    var active: PanelController { lastActive ?? left }
     private var other: PanelController { active === left ? right : left }
 
-    private func activate(_ panel: PanelController) {
+    func activate(_ panel: PanelController) {
         window?.makeFirstResponder(panel.table)
     }
 
@@ -322,9 +334,18 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
 
     private func handleKey(_ event: NSEvent, panel: PanelController) -> Bool {
         let flags = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        if flags == .control, event.keyCode == 12 { // Ctrl+Q
+            showInfo()
+            return true
+        }
+        if flags == .control, event.charactersIgnoringModifiers?.lowercased() == "a" || event.keyCode == 0 {
+            panel.markAll()
+            return true
+        }
         if flags == .option {
             switch event.keyCode {
             case 122: HelpWindowController.show() // Option+F1
+            case 99: compareFiles() // Option+F3
             case 96: startPack() // Option+F5
             case 101: showSSHMenu(nil) // Option+F9
             case 98: showSearch(nil) // Option+F7
@@ -356,17 +377,19 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         case 116: panel.moveCursor(to: panel.table.selectedRow - pageSize(panel))
         case 121: panel.moveCursor(to: panel.table.selectedRow + pageSize(panel))
         case 122: showFavoritesMenu() // F1
-        case 120: showInfo() // F2
+        case 120: mirrorPanel() // F2
         case 99: showPreview() // F3
         case 118: edit(forceChoice: shift) // F4
         case 96: startTransfer(move: false) // F5
         case 97: // F6
             if shift { renameCursor() } else { startTransfer(move: true) }
-        case 98: makeFolder() // F7
+        case 98: // F7
+            if shift { makeFile() } else { makeFolder() }
         case 100, 117: deleteSelection() // F8, forward delete
         case 101: // F9
             if shift { openTerminal() } else { showTerminal() }
         case 109: openWriter() // F10
+        case 103: shareFiles() // F11
         default:
             return panel.jumpToName(typed: event.characters ?? "")
         }
@@ -553,14 +576,25 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             "", verdict,
         ].joined(separator: "\n")
 
-        let choices = [("conflict.overwrite", "o"), ("conflict.overwriteAll", "a"), ("conflict.skip", "s"), ("conflict.skipAll", "k"), ("conflict.cancel", "\u{1b}")]
+        // Only a file can take a new name: a folder landing on a file has nothing to rename into.
+        var choices = [("conflict.overwrite", "o"), ("conflict.overwriteAll", "a"), ("conflict.skip", "s"), ("conflict.skipAll", "k"), ("conflict.cancel", "\u{1b}")]
+        if !conflict.source.isDirectory { choices.insert(("conflict.rename", "r"), at: 0) }
         for (key, shortcut) in choices {
             alert.addButton(withTitle: L10n.t(key)).keyEquivalent = shortcut
         }
-        present(alert) { [weak self] choice in
+        present(alert) { [weak self] pressed in
             guard let self else { return }
             var next = plan
-            switch choice {
+            let hasRename = !conflict.source.isDirectory
+            if hasRename, pressed == 0 {
+                self.askNewName(for: conflict, in: plan, destination: to.source) { [weak self] renamed in
+                    guard let self else { return }
+                    // Cancelling the name goes back to the same question.
+                    self.resolve(plan: renamed ?? plan, index: renamed == nil ? index : index + 1, from: from, to: to, move: move)
+                }
+                return
+            }
+            switch hasRename ? pressed - 1 : pressed {
             case 0:
                 self.resolve(plan: next, index: index + 1, from: from, to: to, move: move)
             case 1:
@@ -573,6 +607,57 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                 self.launch(plan: next, from: from, to: to, move: move)
             default:
                 break // Nothing was transferred, the marks stay.
+            }
+        }
+    }
+
+    /// Replaced in tests, where nobody can fill in a dialog.
+    var askRename: ((String, @escaping (String?) -> Void) -> Void)?
+
+    /// Asks for a free name, offering one. A name that is taken asks again and is never written over.
+    private func askNewName(for conflict: TransferConflict, in plan: TransferPlan, destination: FileSource, completion: @escaping (TransferPlan?) -> Void) {
+        guard let file = plan.files.first(where: { $0.relative == conflict.relative }) else { return completion(nil) }
+        let folder = PathUtil.parent(file.destination)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let names: [String]
+            do {
+                names = try destination.list(folder).map(\.name)
+            } catch {
+                DispatchQueue.main.async {
+                    self?.showError(error.localizedDescription)
+                    completion(nil)
+                }
+                return
+            }
+            let planned = plan.files.filter { PathUtil.parent($0.destination) == folder && !plan.skipped.contains($0.relative) }.map { ($0.destination as NSString).lastPathComponent }
+            let taken = Set(names + planned)
+            let offer = TransferPlan.freeName(for: conflict.source.name, taken: taken)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                let finish: (String?) -> Void = { name in
+                    guard let name else { return completion(nil) }
+                    if taken.contains(name) {
+                        self.showToast(L10n.t("rich.existsTitle", name))
+                        return self.askNewName(for: conflict, in: plan, destination: destination, completion: completion)
+                    }
+                    var next = plan
+                    next.rename(relative: conflict.relative, to: name)
+                    completion(next)
+                }
+                if let askRename = self.askRename { return askRename(offer, finish) }
+                let alert = NSAlert()
+                alert.messageText = L10n.t("conflict.renameTitle")
+                alert.informativeText = conflict.relative
+                let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+                field.stringValue = offer
+                alert.accessoryView = field
+                alert.addButton(withTitle: L10n.t("common.ok"))
+                self.addCancel(to: alert)
+                alert.window.initialFirstResponder = field
+                self.present(alert) { button in
+                    let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                    finish(button == 0 && !name.isEmpty && !name.contains("/") && name != "." && name != ".." ? name : nil)
+                }
             }
         }
     }
@@ -802,7 +887,9 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
     }
 
     private func pickEditor(then next: @escaping () -> Void) {
-        let apps = NSWorkspace.shared.urlsForApplications(toOpen: UTType.plainText)
+        // Balmy Write doesn't say it opens plain text, so the system's list leaves it out.
+        let balmy = ["/Applications/Balmy Write 2.app", "/Applications/Balmy Write.app"].map { URL(fileURLWithPath: $0) }.filter { FileManager.default.fileExists(atPath: $0.path) }
+        let apps = balmy + NSWorkspace.shared.urlsForApplications(toOpen: UTType.plainText).filter { !balmy.contains($0) }
         let alert = NSAlert()
         alert.messageText = L10n.t("editor.title")
         alert.informativeText = L10n.t("editor.help")
@@ -873,6 +960,15 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                     } else if let document {
                         let editor = EditorWindowController(target: target, document: document, stamp: stamp)
                         editor.onSaved = { [weak panel] in panel?.reload() }
+                        editor.onOpenVisual = { [weak self, weak panel, weak editor] target, file, stamp in
+                            guard let self, let panel else { return }
+                            if !RichEditorController.isMarkdownName(target.name), RichDocument.containsServerCode(file.text) {
+                                self.showToast(L10n.t("rich.hasCode", target.name))
+                                return
+                            }
+                            editor?.close()
+                            RichEditorController(target: target, file: file, stamp: stamp, folder: PathUtil.parent(target.path), source: target.source, queue: target.queue).configured(by: self, panel: panel).showWindow(nil)
+                        }
                         editor.onMessage = { [weak self] in self?.showToast($0) }
                         editor.showWindow(nil)
                     } else {
@@ -942,6 +1038,153 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         }
     }
 
+    // MARK: F2: same folder in both panels
+
+    @objc func mirrorClicked(_ sender: Any?) { mirrorPanel() }
+
+    /// The other panel opens what the active one shows, on the same connection.
+    func mirrorPanel() {
+        let from = active
+        let to = from === left ? right : left
+        if from.isInArchive {
+            showToast(L10n.t("mirror.archive"))
+            return
+        }
+        to.connect(site: from.site, source: from.source, path: from.path) { [weak self] error in
+            if let error { self?.showError(error.localizedDescription) }
+        }
+    }
+
+    // MARK: Option+F3: compare files
+
+    /// Replaced in tests, which read what would be shown.
+    var onCompared: ((CompareWindowController) -> Void)?
+    static let compareLimit = 32 << 20
+
+    @objc func compareClicked(_ sender: Any?) { compareFiles() }
+
+    /// Two marked files, or the file at the cursor and its namesake (or else the cursor) in the other panel.
+    func comparePair() -> (first: (FileEntry, PanelController), second: (FileEntry, PanelController))? {
+        let here = active
+        let there = here === left ? right : left
+        let marked = here.selection.filter { !$0.isDirectory }
+        if here.marked.count == 2, marked.count == 2 { return ((marked[0], here), (marked[1], here)) }
+        guard let entry = here.cursorEntry, !entry.isDirectory else { return nil }
+        let other = there.rows.first { $0.name == entry.name && !$0.isDirectory } ?? there.cursorEntry
+        guard let other, !other.isDirectory else { return nil }
+        return here === left ? ((entry, here), (other, there)) : ((other, there), (entry, here))
+    }
+
+    func compareFiles() {
+        guard let pair = comparePair() else {
+            showToast(L10n.t("compare.choose"))
+            return
+        }
+        localCopy(of: pair.first.0, in: pair.first.1) { [weak self] firstURL in
+            guard let self, let firstURL else { return }
+            self.localCopy(of: pair.second.0, in: pair.second.1) { [weak self] secondURL in
+                guard let self, let secondURL else { return }
+                let firstName = self.panelPath(pair.first.1, pair.first.0), secondName = self.panelPath(pair.second.1, pair.second.0)
+                DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                    let result = Self.compareContents(firstURL, secondURL)
+                    DispatchQueue.main.async {
+                        guard let self else { return }
+                        switch result {
+                        case .failed(let message): self.showError(message)
+                        case .binary(let message): self.showToast(message)
+                        case .text(let a, let b, let differ):
+                            let window = CompareWindowController(left: .init(title: firstName, text: a), right: .init(title: secondName, text: b), bytesDiffer: differ)
+                            window.showWindow(nil)
+                            self.onCompared?(window)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private enum CompareResult {
+        case text(String, String, differ: Bool)
+        case binary(String)
+        case failed(String)
+    }
+
+    private static func compareContents(_ first: URL, _ second: URL) -> CompareResult {
+        func size(_ url: URL) -> Int { ((try? FileManager.default.attributesOfItem(atPath: url.path)[.size]) as? NSNumber)?.intValue ?? 0 }
+        let sizes = (size(first), size(second))
+        if max(sizes.0, sizes.1) > compareLimit { return bytes(first, second, sizes) }
+        do {
+            let a = try Data(contentsOf: first), b = try Data(contentsOf: second)
+            guard let textA = EditorDocument.decode(a), let textB = EditorDocument.decode(b) else { return bytes(first, second, sizes) }
+            return .text(textA.text, textB.text, differ: a != b)
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
+    /// For pictures, programs and anything too long to lay out: only whether the bytes match, and where they stop.
+    private static func bytes(_ first: URL, _ second: URL, _ sizes: (Int, Int)) -> CompareResult {
+        guard let a = try? FileHandle(forReadingFrom: first), let b = try? FileHandle(forReadingFrom: second) else { return .failed(L10n.t("compare.cannotRead")) }
+        defer {
+            try? a.close()
+            try? b.close()
+        }
+        var offset = 0
+        while true {
+            let partA = (try? a.read(upToCount: 1 << 20)) ?? Data()
+            let partB = (try? b.read(upToCount: 1 << 20)) ?? Data()
+            if partA.isEmpty && partB.isEmpty { return .binary(L10n.t("compare.bytesSame", Format.size(Int64(sizes.0)))) }
+            if partA != partB {
+                let place = zip(partA, partB).enumerated().first { $0.element.0 != $0.element.1 }?.offset ?? min(partA.count, partB.count)
+                return .binary(L10n.t("compare.bytesDiffer", String(offset + place + 1), Format.size(Int64(sizes.0)), Format.size(Int64(sizes.1))))
+            }
+            offset += partA.count
+        }
+    }
+
+    // MARK: F11: share
+
+    /// Replaced in tests, where a sharing menu would wait for a click.
+    var presentShare: (([URL]) -> Void)?
+    var functionButtonKeys: [String] { functionButtons.map(\.0) }
+
+    @objc func shareClicked(_ sender: Any?) { shareFiles() }
+
+    /// Marked files, or the one under the cursor. Files on a server are downloaded first.
+    func shareFiles() {
+        let panel = active
+        let picked = panel.selection
+        let files = panel.source.isRemote ? picked.filter { !$0.isDirectory } : picked
+        guard !files.isEmpty else {
+            showToast(L10n.t(picked.isEmpty ? "share.nothing" : "share.noRemoteFolders"))
+            return
+        }
+        if panel.source.isRemote { showToast(L10n.t("status.downloading", files.count == 1 ? files[0].name : String(files.count))) }
+        var urls: [URL] = []
+        func next(_ remaining: ArraySlice<FileEntry>) {
+            guard let entry = remaining.first else {
+                present(share: urls)
+                return
+            }
+            localCopy(of: entry, in: panel) { url in
+                // A failed download has already shown its error, and nothing half done gets shared.
+                guard let url else { return }
+                urls.append(url)
+                next(remaining.dropFirst())
+            }
+        }
+        next(files[...])
+    }
+
+    private func present(share urls: [URL]) {
+        if let presentShare {
+            presentShare(urls)
+            return
+        }
+        guard let anchor = functionButtons.first(where: { $0.0 == "F11" })?.2 else { return }
+        NSSharingServicePicker(items: urls).show(relativeTo: anchor.bounds, of: anchor, preferredEdge: .minY)
+    }
+
     // MARK: F10: writing editor
 
     /// Opens the HTML file under the cursor, or a new document in the active folder.
@@ -950,7 +1193,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
         if blockedByArchive(panel) { return }
         let source = panel.source.isRemote ? panel.source : nil
         let queue = downloadQueue
-        guard let entry = panel.cursorEntry, !entry.isDirectory, ["html", "htm"].contains((entry.name as NSString).pathExtension.lowercased()) else {
+        guard let entry = panel.cursorEntry, !entry.isDirectory, ["html", "htm", "md", "markdown", "mdown", "mkd"].contains((entry.name as NSString).pathExtension.lowercased()) else {
             RichEditorController(target: nil, file: nil, stamp: nil, folder: panel.path, source: source, queue: queue).configured(by: self, panel: panel).showWindow(nil)
             return
         }
@@ -976,7 +1219,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                         self.showToast(L10n.t("edit.notText", entry.name))
                         return
                     }
-                    if RichDocument.containsServerCode(file.text) {
+                    if !RichEditorController.isMarkdownName(entry.name), RichDocument.containsServerCode(file.text) {
                         self.showToast(L10n.t("rich.hasCode", entry.name))
                         return
                     }
@@ -1034,7 +1277,10 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                 return
             }
             let detail = Format.size(entry.size) + (panel.source.isRemote ? " · " + L10n.t("preview.fromServer") : "")
-            let viewer = TextViewerController(name: entry.name, detail: detail, text: text)
+            let page = TextViewerController.pageHTML(fileName: entry.name, text: text).map {
+                TextViewerController.PageView(html: $0, folder: panel.path, source: panel.source.isRemote ? panel.source : nil, queue: self.downloadQueue)
+            }
+            let viewer = TextViewerController(name: entry.name, detail: detail, text: text, pageView: page)
             viewer.onEdit = { [weak self, weak panel] in
                 guard let self, let panel else { return }
                 self.launchEditor(entry, in: panel)
@@ -1166,6 +1412,78 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
                 DispatchQueue.main.async {
                     self?.showError(error.localizedDescription)
                     panel.reload()
+                }
+            }
+        }
+    }
+
+    /// Replaced in tests, where nobody can fill in a dialog.
+    var askNewFile: ((@escaping (String, NewFileKind) -> Void) -> Void)?
+
+    @objc func newFileClicked(_ sender: Any?) { makeFile() }
+
+    /// Shift+F7: makes the file, never over an existing one, and opens it in the editor.
+    func makeFile() {
+        let panel = active
+        if blockedByArchive(panel) { return }
+        let create: (String, NewFileKind) -> Void = { [weak self] typed, kind in
+            guard let self else { return }
+            guard let name = kind.fileName(typed: typed) else {
+                self.showToast(L10n.t("newFile.badName"))
+                return
+            }
+            self.create(name: name, kind: kind, in: panel)
+        }
+        if let askNewFile { return askNewFile(create) }
+        let alert = NSAlert()
+        alert.messageText = L10n.t("newFile.title")
+        let field = NSTextField(frame: NSRect(x: 0, y: 30, width: 320, height: 24))
+        let popup = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 320, height: 24), pullsDown: false)
+        NewFileKind.allCases.forEach { popup.addItem(withTitle: L10n.t("newFile.\($0.rawValue)")) }
+        let holder = NSView(frame: NSRect(x: 0, y: 0, width: 320, height: 56))
+        holder.addSubview(field)
+        holder.addSubview(popup)
+        alert.accessoryView = holder
+        alert.addButton(withTitle: L10n.t("mkdir.confirm"))
+        addCancel(to: alert)
+        alert.window.initialFirstResponder = field
+        present(alert) { button in
+            if button == 0 { create(field.stringValue, NewFileKind.allCases[popup.indexOfSelectedItem]) }
+        }
+    }
+
+    private func create(name: String, kind: NewFileKind, in panel: PanelController) {
+        let path = PathUtil.join(panel.path, name)
+        let folder = panel.path
+        let source = panel.source
+        let content = Data(kind.content(title: (name as NSString).deletingPathExtension).utf8)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self, weak panel] in
+            var failure: String?
+            do {
+                if (try source.list(folder)).contains(where: { $0.name == name }) {
+                    failure = L10n.t("rich.existsTitle", name)
+                } else if source.isRemote {
+                    let holder = FileManager.default.temporaryDirectory.appendingPathComponent("macdows-new-\(UUID().uuidString)")
+                    try FileManager.default.createDirectory(at: holder, withIntermediateDirectories: true)
+                    defer { try? FileManager.default.removeItem(at: holder) }
+                    let file = holder.appendingPathComponent(name)
+                    try content.write(to: file)
+                    try source.upload(file, to: path) { _ in true }
+                } else {
+                    try content.write(to: URL(fileURLWithPath: path), options: .withoutOverwriting)
+                }
+            } catch {
+                failure = error.localizedDescription
+            }
+            DispatchQueue.main.async {
+                guard let self, let panel else { return }
+                if let failure {
+                    self.showError(failure)
+                    return
+                }
+                panel.load(path: folder, select: name) { [weak self, weak panel] error in
+                    guard let self, let panel, error == nil, panel.cursorEntry?.name == name else { return }
+                    if panel === self.active { self.edit(forceChoice: false) }
                 }
             }
         }
@@ -1570,14 +1888,27 @@ final class MainWindowController: NSWindowController, NSWindowDelegate, NSMenuIt
             self.startQueueTimer()
         }
         guard let conflict = plan.conflicts.first else { return send() }
+        let rename = { [weak self] in
+            guard let self else { return }
+            self.askNewName(for: conflict, in: plan, destination: destination) { [weak self] renamed in
+                guard let self else { return }
+                if let renamed {
+                    self.engine.start(plan: renamed, title: L10n.t(destination.isRemote ? "queue.toServer" : "queue.toDisk", "1") + " · " + name, source: LocalSource(), destination: destination, move: false, parallel: [from.site, to.site].compactMap { $0?.parallel }.min() ?? 4)
+                    self.startQueueTimer()
+                } else {
+                    self.sendPacked(plan: plan, name: name, from: from, to: to, destination: destination, size: size)
+                }
+            }
+        }
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = L10n.t("conflict.title")
         alert.informativeText = conflict.relative + "\n\n" + L10n.t("conflict.target") + ": " + Format.size(conflict.destination.size) + "  " + Format.date(conflict.destination.date)
+        alert.addButton(withTitle: L10n.t("conflict.rename")).keyEquivalent = "r"
         alert.addButton(withTitle: L10n.t("conflict.overwrite")).keyEquivalent = "o"
         addCancel(to: alert)
         present(alert) { [weak self] button in
-            if button == 0 { send() } else { self?.removeFinishedPackFolders() }
+            if button == 0 { rename() } else if button == 1 { send() } else { self?.removeFinishedPackFolders() }
         }
     }
 

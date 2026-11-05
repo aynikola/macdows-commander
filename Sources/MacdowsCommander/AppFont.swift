@@ -11,7 +11,7 @@ enum AppFont {
     static let defaultSize: CGFloat = 14
     static let systemFamily = "system"
     /// All of these come with every Mac.
-    static let families = ["Verdana", "Tahoma", "Lucida Grande", "Arial", "Helvetica Neue", "Menlo", systemFamily]
+    static let families = ["Verdana", "Georgia", "Tahoma", "Lucida Grande", "Arial", "Helvetica Neue", "Menlo", systemFamily]
     /// San Francisco looks thin and pale on a dark list, so the default is a plainer, wider face.
     static let defaultFamily = "Verdana"
     static let monoFamily = "Menlo"

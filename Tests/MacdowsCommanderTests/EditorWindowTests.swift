@@ -37,6 +37,56 @@ final class EditorWindowTests: XCTestCase {
         return (editor, url)
     }
 
+    func testSaveAsWritesANewFileAndKeepsTheOldOne() throws {
+        let (editor, url) = try open("a.txt", Data("eski".utf8))
+        editor.textView.string = "yeni"
+        editor.textDidChange(Notification(name: .init("x")))
+        XCTAssertTrue(editor.isDirty)
+        let target = folder.appendingPathComponent("b.php")
+        editor.chooseSavePath = { $0(target.path) }
+        var result: Bool?
+        editor.saveAs { result = $0 }
+        spin("saved") { result != nil }
+        XCTAssertEqual(result, true)
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "yeni")
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "eski")
+        XCTAssertFalse(editor.isDirty)
+        XCTAssertEqual(editor.target.path, target.path)
+        XCTAssertEqual(editor.target.name, "b.php")
+        XCTAssertEqual(editor.language, .php)
+        XCTAssertTrue(editor.window?.title.contains("b.php") ?? false)
+        // Plain save now goes to the new file.
+        editor.textView.string = "yeni2"
+        editor.textDidChange(Notification(name: .init("x")))
+        result = nil
+        editor.save { result = $0 }
+        spin("saved again") { result != nil }
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "yeni2")
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "eski")
+    }
+
+    func testSaveAsCancelledChangesNothing() throws {
+        let (editor, _) = try open("a.txt", Data("eski".utf8))
+        editor.chooseSavePath = { $0(nil) }
+        var result: Bool?
+        editor.saveAs { result = $0 }
+        XCTAssertEqual(result, false)
+        XCTAssertEqual(editor.target.name, "a.txt")
+    }
+
+    func testSaveAsRefusesAFileOpenInAnotherEditor() throws {
+        let (editor, _) = try open("a.txt", Data("a".utf8))
+        let (other, url) = try open("c.txt", Data("c".utf8))
+        _ = other
+        editor.chooseSavePath = { $0(url.path) }
+        var result: Bool?
+        editor.saveAs { result = $0 }
+        spin("refused") { result != nil }
+        XCTAssertEqual(result, false)
+        editor.window?.attachedSheet.map { editor.window?.endSheet($0) }
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "c")
+    }
+
     private func key(_ editor: EditorWindowController, _ letter: String, _ flags: NSEvent.ModifierFlags, code: UInt16 = 0) -> Bool {
         let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: editor.window!.windowNumber, context: nil, characters: letter, charactersIgnoringModifiers: letter, isARepeat: false, keyCode: code)!
         return editor.handleKey(event)

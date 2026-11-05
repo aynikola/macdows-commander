@@ -184,6 +184,101 @@ final class MainWindowTests: XCTestCase {
         try image.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
     }
 
+    func testF11SharesMarkedFilesOrTheOneUnderTheCursor() throws {
+        var shared: [URL] = []
+        controller.presentShare = { shared = $0 }
+        let panel = controller.left
+        panel.select(name: "file.txt")
+        panel.table.keyDown(with: key(103))
+        XCTAssertEqual(shared.map(\.lastPathComponent), ["file.txt"])
+        XCTAssertEqual(controller.functionButtonKeys.contains("F11"), true)
+        panel.table.keyDown(with: key(114))
+        XCTAssertFalse(panel.marked.isEmpty, "Ins marks it")
+        let marked = panel.marked
+        panel.select(name: "..")
+        panel.table.keyDown(with: key(103))
+        XCTAssertEqual(Set(shared.map(\.lastPathComponent)), marked, "marked files win over the cursor")
+    }
+
+    func testOpenSameShowsTheActivePanelsFolderInTheOther() throws {
+        let sub = root.appendingPathComponent("baska")
+        try FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
+        let before = controller.right.path
+        var done = false
+        controller.left.load(path: sub.path, select: nil) { _ in done = true }
+        spin("left loaded") { done }
+        XCTAssertNotEqual(before, sub.path)
+        controller.activate(controller.left)
+        controller.left.table.keyDown(with: key(120))
+        spin("right follows") { controller.right.path == sub.path }
+        XCTAssertTrue(controller.right.source === controller.left.source)
+    }
+
+    func testShiftF7MakesAFileAndNeverOverwrites() throws {
+        var answer = ("yeni", NewFileKind.md)
+        controller.askNewFile = { $0(answer.0, answer.1) }
+        controller.active.table.keyDown(with: key(98, flags: .shift))
+        let path = URL(fileURLWithPath: controller.active.path).appendingPathComponent("yeni.md")
+        spin("created") { FileManager.default.fileExists(atPath: path.path) }
+        XCTAssertEqual(try String(contentsOf: path, encoding: .utf8), "# yeni\n\n")
+        spin("opened") { EditorWindowController.existing(path: path.path, source: nil) != nil }
+        EditorWindowController.existing(path: path.path, source: nil)?.close()
+
+        try "dolu".write(to: path, atomically: true, encoding: .utf8)
+        answer = ("yeni.md", .txt)
+        controller.active.table.keyDown(with: key(98, flags: .shift))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        NSApp.windows.compactMap(\.attachedSheet).forEach { $0.sheetParent?.endSheet($0) }
+        XCTAssertEqual(try String(contentsOf: path, encoding: .utf8), "dolu")
+    }
+
+    func testCompareTakesTheSameNameInTheOtherPanel() throws {
+        let other = root.appendingPathComponent("karsi")
+        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        try "x\ny\n".write(to: other.appendingPathComponent("file.txt"), atomically: true, encoding: .utf8)
+        var done = false
+        controller.right.load(path: other.path, select: nil) { _ in done = true }
+        spin("right loaded") { done }
+        controller.activate(controller.left)
+        controller.left.select(name: "file.txt")
+        let pair = try XCTUnwrap(controller.comparePair())
+        XCTAssertEqual(pair.first.0.name, "file.txt")
+        XCTAssertTrue(pair.second.1 === controller.right)
+        var shown: CompareWindowController?
+        controller.onCompared = { shown = $0 }
+        controller.left.table.keyDown(with: key(99, flags: .option))
+        spin("compared") { shown != nil }
+        XCTAssertFalse(try XCTUnwrap(shown).changes.isEmpty)
+        shown?.moveChange(by: 1)
+        XCTAssertEqual(shown?.currentChange, 0, "one change wraps round to itself")
+        shown?.close()
+    }
+
+    func testShiftClickMarksARangeAndCtrlAMarksAll() throws {
+        let panel = controller.left
+        for name in ["r1.txt", "r2.txt", "r3.txt"] { try "x".write(to: root.appendingPathComponent(name), atomically: true, encoding: .utf8) }
+        var done = false
+        panel.load(path: panel.path, select: "r1.txt") { _ in done = true }
+        spin("loaded") { done }
+        let last = try XCTUnwrap(panel.rows.firstIndex { $0.name == "r3.txt" })
+        panel.markRange(to: last)
+        XCTAssertEqual(panel.marked, ["r1.txt", "r2.txt", "r3.txt"])
+        XCTAssertEqual(panel.cursorEntry?.name, "r3.txt")
+        panel.clearMarks()
+        let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .control, timestamp: 0, windowNumber: controller.window!.windowNumber, context: nil, characters: "\u{01}", charactersIgnoringModifiers: "a", isARepeat: false, keyCode: 0)!
+        panel.table.keyDown(with: event)
+        XCTAssertEqual(panel.marked, Set(panel.rows.map(\.name).filter { $0 != ".." }))
+        XCTAssertFalse(panel.marked.contains(".."))
+        panel.table.keyDown(with: event)
+        XCTAssertTrue(panel.marked.isEmpty, "again clears them")
+    }
+
+    func testGitButtonsAreListedAndChangesWaitForEnter() {
+        let commands = Dictionary(uniqueKeysWithValues: TerminalPane.gitCommands.map { ($0.title, $0) })
+        for title in ["status", "diff", "log", "branch"] { XCTAssertEqual(commands[title]?.run, true, title) }
+        for title in ["add .", "commit", "pull", "push", "switch"] { XCTAssertEqual(commands[title]?.run, false, title) }
+    }
+
     func testF4OpensTheBuiltInEditorOnce() {
         UserDefaults.standard.removeObject(forKey: "editorBuiltIn")
         let panel = controller.left

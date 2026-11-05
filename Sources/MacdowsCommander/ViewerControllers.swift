@@ -1,6 +1,7 @@
 import AppKit
 import ImageIO
 import MacdowsCore
+import WebKit
 
 /// One image in the viewer. `fetch` gives a local file: right away on disk, after a download on a server.
 struct ViewerItem {
@@ -572,16 +573,9 @@ final class ImageViewerController: NSWindowController, NSWindowDelegate, NSTextF
     }
 }
 
-private final class ViewerTextView: NSTextView {
-    var onKey: ((NSEvent) -> Bool)?
+private final class ViewerTextView: NSTextView {}
 
-    override func keyDown(with event: NSEvent) {
-        if onKey?(event) == true { return }
-        super.keyDown(with: event)
-    }
-}
-
-final class TextViewerController: NSWindowController, NSWindowDelegate {
+final class TextViewerController: NSWindowController, NSWindowDelegate, WKNavigationDelegate {
     var onEdit: (() -> Void)?
     var onClosed: (() -> Void)?
 
@@ -601,19 +595,45 @@ final class TextViewerController: NSWindowController, NSWindowDelegate {
         return String(data: data, encoding: turkish)
     }
 
-    init(name: String, detail: String, text: String) {
+    /// How an HTML or Markdown file can also be shown as a page.
+    struct PageView {
+        let html: String
+        let folder: String
+        let source: FileSource?
+        let queue: DispatchQueue
+    }
+
+    private static let showsPageKey = "viewer.showsPage"
+    private let pageView: PageView?
+    private var webView: WKWebView?
+    private let textScroll: NSScrollView
+    private let modes = NSSegmentedControl()
+
+    /// The page for a file this viewer can show as one, or nil.
+    static func pageHTML(fileName: String, text: String) -> String? {
+        switch (fileName as NSString).pathExtension.lowercased() {
+        case "html", "htm": return text
+        case "md", "markdown", "mdown", "mkd": return Markdown.page(text)
+        default: return nil
+        }
+    }
+
+    var isShowingPage: Bool { webView?.isHidden == false }
+
+    init(name: String, detail: String, text: String, pageView: PageView? = nil) {
+        self.pageView = pageView
         let frame = NSRect(x: 0, y: 0, width: 960, height: 720)
-        let window = NSWindow(contentRect: frame, styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
+        let window = KeyFirstWindow(contentRect: frame, styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.title = "\(name) — \(detail)"
         Theme.apply(to: window)
+        textScroll = ViewerTextView.scrollableTextView()
         super.init(window: window)
         window.delegate = self
         window.center()
 
-        let scroll = ViewerTextView.scrollableTextView()
         // scrollableTextView gives a plain NSTextView, so build our own subclass inside it.
-        let textView = ViewerTextView(frame: scroll.bounds)
+        let textView = ViewerTextView(frame: textScroll.bounds)
         textView.autoresizingMask = [.width]
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
@@ -625,21 +645,105 @@ final class TextViewerController: NSWindowController, NSWindowDelegate {
         textView.textColor = Theme.text
         textView.string = text
         textView.textContainerInset = NSSize(width: 8, height: 8)
-        textView.onKey = { [weak self] event in
-            switch event.keyCode {
-            case 53, 99:
-                self?.close()
-                return true
-            case 118:
-                self?.onEdit?()
-                return true
-            default:
-                return false
-            }
+        textScroll.documentView = textView
+        window.onKey = { [weak self] in self?.handleKey($0) ?? false }
+
+        guard pageView != nil, let content = window.contentView else {
+            window.contentView = textScroll
+            window.makeFirstResponder(textView)
+            return
         }
-        scroll.documentView = textView
-        window.contentView = scroll
-        window.makeFirstResponder(textView)
+        modes.segmentCount = 2
+        modes.setLabel(L10n.t("viewer.source"), forSegment: 0)
+        modes.setLabel(L10n.t("viewer.page"), forSegment: 1)
+        modes.trackingMode = .selectOne
+        modes.controlSize = .small
+        modes.font = AppFont.interface(12)
+        modes.target = self
+        modes.action = #selector(modeChanged)
+        modes.toolTip = "Tab"
+        modes.refusesFirstResponder = true
+        modes.translatesAutoresizingMaskIntoConstraints = false
+        textScroll.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(modes)
+        content.addSubview(textScroll)
+        NSLayoutConstraint.activate([
+            modes.topAnchor.constraint(equalTo: content.topAnchor, constant: 6),
+            modes.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 8),
+            textScroll.topAnchor.constraint(equalTo: modes.bottomAnchor, constant: 6),
+            textScroll.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            textScroll.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            textScroll.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+        ])
+        // The page is what most people open these files to see, until they choose otherwise.
+        let showsPage = UserDefaults.standard.object(forKey: Self.showsPageKey) as? Bool ?? true
+        show(page: showsPage)
+    }
+
+    private func handleKey(_ event: NSEvent) -> Bool {
+        switch event.keyCode {
+        case 53, 99:
+            close()
+        case 118:
+            onEdit?()
+        case 48 where pageView != nil:
+            show(page: !isShowingPage)
+            UserDefaults.standard.set(isShowingPage, forKey: Self.showsPageKey)
+        default:
+            return false
+        }
+        return true
+    }
+
+    @objc private func modeChanged() {
+        show(page: modes.selectedSegment == 1)
+        UserDefaults.standard.set(isShowingPage, forKey: Self.showsPageKey)
+    }
+
+    func show(page: Bool) {
+        modes.selectedSegment = page ? 1 : 0
+        if page, webView == nil { buildPage() }
+        webView?.isHidden = !page
+        textScroll.isHidden = page
+        window?.makeFirstResponder(page ? webView : textScroll.documentView)
+    }
+
+    private func buildPage() {
+        guard let pageView, let content = window?.contentView else { return }
+        let configuration = WKWebViewConfiguration()
+        // A file off a server is only ever looked at here: its scripts don't run.
+        configuration.defaultWebpagePreferences.allowsContentJavaScript = false
+        configuration.setURLSchemeHandler(DocumentFilesHandler(source: pageView.source, queue: pageView.queue), forURLScheme: DocumentFilesHandler.scheme)
+        let web = WKWebView(frame: textScroll.frame, configuration: configuration)
+        web.navigationDelegate = self
+        web.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(web)
+        NSLayoutConstraint.activate([
+            web.topAnchor.constraint(equalTo: textScroll.topAnchor),
+            web.leadingAnchor.constraint(equalTo: textScroll.leadingAnchor),
+            web.trailingAnchor.constraint(equalTo: textScroll.trailingAnchor),
+            web.bottomAnchor.constraint(equalTo: textScroll.bottomAnchor),
+        ])
+        var base = URLComponents()
+        base.scheme = DocumentFilesHandler.scheme
+        base.host = "doc"
+        base.path = pageView.folder.hasSuffix("/") ? pageView.folder : pageView.folder + "/"
+        web.loadHTMLString(pageView.html, baseURL: base.url)
+        webView = web
+    }
+
+    /// Links open in the browser, so the viewer keeps showing the file.
+    func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        guard action.navigationType == .linkActivated, let url = action.request.url else {
+            decisionHandler(.allow)
+            return
+        }
+        if url.scheme == DocumentFilesHandler.scheme, url.fragment != nil {
+            decisionHandler(.allow)
+            return
+        }
+        if ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? "") { NSWorkspace.shared.open(url) }
+        decisionHandler(.cancel)
     }
 
     required init?(coder: NSCoder) { fatalError("Not used") }

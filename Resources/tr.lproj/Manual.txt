@@ -14,10 +14,13 @@ Enter | Klasöre veya arşive gir; dosyayı sorup ilişkili programla aç
 Shift+Enter | Arşivin içine girmeden ilişkili programla açmayı sor
 Backspace | Üst klasöre çık
 Ins, Boşluk, sağ tık | Dosyayı işaretle / işareti kaldır
+Shift+tık | İmleçten tıklanan satıra kadar işaretle
+Ctrl+Q | Klasör boyutu ve bilgi
+Ctrl+A veya ⌘A | Hepsini işaretle; yine basınca işaretleri kaldır
 
 ## F tuşları
 F1 | Favori klasörler
-F2 | Klasör boyutu ve bilgi
+F2 | Diğer panelde bu klasörü aç
 F3 | Hızlı önizleme
 F4 | Editörde aç
 Shift+F4 | F4 için başka editör seç
@@ -25,9 +28,12 @@ F5 | Diğer panele kopyala veya gönder
 F6 | Diğer panele taşı
 Shift+F6 | Yeniden adlandır
 F7 | Yeni klasör
+Shift+F7 | Yeni dosya: txt, html veya md
+⌥F3 | Karşılaştır: iki işaretli dosya, veya iki paneldeki dosyalar (aynı adlı varsa o)
 F8 veya Delete (⌦) | Sil
 F9 | Alttaki terminal, bu klasörde
 F10 | Yazı editörü: bu HTML dosyası veya yeni belge
+F11 | Paylaş: işaretli dosyalar veya imlecin üstündeki dosya
 Shift+F9 | Ayrı Terminal penceresi
 
 ## Option ile
@@ -70,7 +76,14 @@ T | Resme yazı: renk, yazı tipi, gölge; resimde sürükleyerek taşınır
 F4 | Editörde aç
 Esc veya F3 | Kapat
 
+## F3 önizleme (HTML ve Markdown)
+Tab | Kaynak ile görünüm arasında geç
+F4 | Editörde aç
+Esc veya F3 | Kapat
+
 ## Editör
+⌘⇧S | Farklı kaydet
+Görsel düzenle | HTML ve Markdown dosyasını F10 yazı editöründe aç
 ⌃S veya ⌘S | Kaydet
 ⌃F veya ⌘F | Bul
 ⌃H veya ⌘⌥F | Değiştir
@@ -123,7 +136,7 @@ Başka sunucu üzerinden | Önce o sunucuyu kaydedin, sonra Şunun üzerinden al
 Parolayı boş bırakırsanız terminal sorar; tek kullanımlık kodlar için de bu uygundur.
 
 ## Yazı editörü
-F10 imlecin üstündeki HTML dosyasını okunacağı haliyle açar, başka yerdeyseniz Balmy stilinde yeni belge başlatır. Doğrudan sayfanın üstüne yazarsınız; üstteki düğmeler başlık, liste, tablo ve renkli kutu ekler. Tablo menüsü satır ve sütun ekler, siler. Tab sonraki hücreye geçer.
+F10 imlecin üstündeki HTML veya Markdown dosyasını okunacağı haliyle açar, başka yerdeyseniz Balmy stilinde yeni belge başlatır. Doğrudan sayfanın üstüne yazarsınız; imlecin bulunduğu biçimin düğmesi üstte vurgulanır; üstteki düğmeler başlık, liste, tablo ve renkli kutu ekler. ⌘⇧K kaynağı gösterir, ⌘⇧S farklı kaydeder. Yapıştırılan metinde düğmelerle yapılabilenler dışındaki etiket, öznitelik ve betikler silinir. Tablo menüsü satır ve sütun ekler, siler. Tab sonraki hücreye geçer.
 ⌘B ⌘I ⌘U | Kalın, italik, altı çizili
 ⌘1 ⌘2 ⌘3 ⌘0 | Başlık 1, 2, 3, düz paragraf
 ⌘K | Bağlantı

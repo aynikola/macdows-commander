@@ -11,7 +11,7 @@ public struct RichDocument: Equatable {
     public static let closing = "\n    </article>\n</body>\n</html>\n"
 
     public static var blank: RichDocument {
-        RichDocument(prefix: balmyTemplate, content: "\n<h1></h1>\n<p><br></p>\n", suffix: closing)
+        RichDocument(prefix: balmyTemplate, content: "\n<p><br></p>\n", suffix: closing)
     }
 
     /// A new document that starts with this content instead of an empty page.
