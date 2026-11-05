@@ -4,7 +4,7 @@ A native two-panel file manager for macOS, in the spirit of Windows Commander. W
 
 **English** · [Türkçe](README.tr.md)
 
-![Macdows Commander with the Windows Commander theme](docs/images/theme-windows-commander.jpg)
+![Macdows Commander: file panels, terminal, code editor and image tool](docs/images/hero.jpg)
 
 ## Features
 
@@ -95,7 +95,7 @@ The tests against live servers are skipped unless `MC_TEST_DIR` is set. See `scr
 
 [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) for the terminal and [libwebp](https://github.com/SDWebImage/libwebp-Xcode) for saving WebP.
 
-The screenshots use a sample folder and made-up servers.
+The screenshots use a sample folder and made-up servers. The photo is [Pink mountain sunset](https://commons.wikimedia.org/wiki/File:Altm%C3%BCnster_-_Pink_mountain_sunset.jpg) by simon, under CC0.
 
 ## License
 

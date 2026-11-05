@@ -4,7 +4,7 @@ macOS için Windows Commander ruhunda, iki panelli yerel dosya yöneticisi. Swif
 
 [English](README.md) · **Türkçe**
 
-![Windows Commander temasıyla Macdows Commander](docs/images/theme-windows-commander.jpg)
+![Macdows Commander: dosya panelleri, terminal, kod editörü ve resim aracı](docs/images/hero.jpg)
 
 ## Özellikler
 
@@ -95,7 +95,7 @@ swift test
 
 Terminal için [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm), WebP kaydetmek için [libwebp](https://github.com/SDWebImage/libwebp-Xcode).
 
-Ekran görüntülerinde örnek bir klasör ve uydurma sunucular kullanıldı.
+Ekran görüntülerinde örnek bir klasör ve uydurma sunucular kullanıldı. Fotoğraf: simon, [Pink mountain sunset](https://commons.wikimedia.org/wiki/File:Altm%C3%BCnster_-_Pink_mountain_sunset.jpg), CC0.
 
 ## Lisans
 
