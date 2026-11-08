@@ -96,6 +96,23 @@ final class TransferRenameTests: XCTestCase {
         XCTAssertEqual(TransferPlan.freeName(for: "README", taken: ["README"]), "README (2)")
         XCTAssertEqual(TransferPlan.freeName(for: "a.tar.gz", taken: []), "a.tar (2).gz")
     }
+
+    func testRenamePolicyGivesEachConflictAFreeName() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let from = base.appendingPathComponent("from"), to = base.appendingPathComponent("to")
+        for folder in [from, to] { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+        defer { try? FileManager.default.removeItem(at: base) }
+        for name in ["a.txt", "b.txt"] { try Data("new".utf8).write(to: from.appendingPathComponent(name)) }
+        for name in ["a.txt", "a (2).txt"] { try Data("old".utf8).write(to: to.appendingPathComponent(name)) }
+        let source = LocalSource()
+        let selection = try source.list(from.path).filter { !$0.isDirectory }
+        var plan = try TransferPlanner.plan(selection: selection, from: source, sourceDirectory: from.path, to: source, destinationDirectory: to.path)
+        plan.applyPolicy(.rename)
+        try plan.renameConflicts { try source.list($0).map(\.name) }
+        let targets = Dictionary(uniqueKeysWithValues: plan.files.map { ($0.relative, PathUtil.lastComponent($0.destination)) })
+        XCTAssertEqual(targets["a.txt"], "a (3).txt")
+        XCTAssertEqual(targets["b.txt"], "b.txt")
+    }
 }
 
 final class FrontMatterTests: XCTestCase {

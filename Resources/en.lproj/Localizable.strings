@@ -63,6 +63,7 @@
 "policy.ask" = "Ask every time";
 "policy.overwrite" = "Overwrite";
 "policy.newer" = "Overwrite only if newer";
+"policy.rename" = "Rename the new file";
 "policy.skip" = "Skip";
 
 "conflict.title" = "File already exists";
@@ -415,6 +416,7 @@
 "menu.sortName" = "Sort by Name";
 "menu.sortSize" = "Sort by Size";
 "menu.sortDate" = "Sort by Date";
+"menu.sortRecent" = "Newest First, Folders and Files Together";
 "menu.pathBox" = "Go to Path Box";
 
 "compare.newer" = "Newer";

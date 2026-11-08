@@ -63,6 +63,7 @@
 "policy.ask" = "Her seferinde sor";
 "policy.overwrite" = "Üzerine yaz";
 "policy.newer" = "Yalnızca daha yeniyse yaz";
+"policy.rename" = "Yeni dosyayı yeniden adlandır";
 "policy.skip" = "Atla";
 
 "conflict.title" = "Dosya zaten var";
@@ -415,6 +416,7 @@
 "menu.sortName" = "Ada Göre Sırala";
 "menu.sortSize" = "Boyuta Göre Sırala";
 "menu.sortDate" = "Tarihe Göre Sırala";
+"menu.sortRecent" = "En Yeni Üstte, Klasör ve Dosya Karışık";
 "menu.pathBox" = "Yol Kutusuna Git";
 
 "compare.newer" = "Daha yeni";

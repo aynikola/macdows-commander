@@ -15,11 +15,13 @@ Shift+Enter | Offer the associated app instead of looking inside an archive
 Backspace | Go to the parent folder
 Ins, Space, right click | Mark / unmark a file
 Shift+click | Mark from the cursor to the clicked row
+Second, slower click on the cursor's name | Rename in place: Enter saves, Esc cancels
 Ctrl+Q | Folder size and info
 Drag from Finder | Dropping on a panel copies, on a folder row copies into it, with ⌘ moves
 ⌘1 or Ctrl+1 | Sort by name; again reverses it
 ⌘2 or Ctrl+2 | Sort by size, largest first
 ⌘3 or Ctrl+3 | Sort by date, newest first
+⌘4 or Ctrl+4 | Newest on top, folders and files mixed
 ⌘L | Path box at the bottom: paste a path, Enter goes, Esc cancels
 Ctrl+A or ⌘A | Mark everything; again to clear the marks
 
@@ -69,7 +71,7 @@ Esc | Cancel the transfer
 
 ## F3 preview (images)
 Right, Down, Space, Page Down | Next image
-Left, Up, Page Up | Previous image
+Left, Up, Backspace, Page Up | Previous image
 Home / End | First / last image
 + / - / 0 | Zoom in / out / fit
 C | Crop: drag, Enter applies, Esc cancels
@@ -80,6 +82,12 @@ T | Text on the picture: color, font, shadow; drag it to move it
 ⌘Z / ⌘⇧Z | Undo / redo
 ⌘S | Save as PNG, JPG or WebP
 F4 | Open in the editor
+Esc or F3 | Close
+
+## F3 preview (video and audio)
+Space | Play / pause
+Left / Right | 5 seconds back / forward
+Page Up / Page Down | Previous / next video
 Esc or F3 | Close
 
 ## F3 preview (HTML and Markdown)

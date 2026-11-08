@@ -387,6 +387,61 @@ final class MainWindowTests: XCTestCase {
         XCTAssertEqual(files(), ["c.txt", "b.txt", "a.txt"])
     }
 
+    func testRecentSortMixesFoldersAndFilesNewestFirst() throws {
+        let panel = controller.left
+        let folder = root.appendingPathComponent("karisik")
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("eski"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("yeni"), withIntermediateDirectories: true)
+        try "x".write(to: folder.appendingPathComponent("orta.txt"), atomically: true, encoding: .utf8)
+        for (name, time) in [("eski", 1000.0), ("orta.txt", 2000), ("yeni", 3000)] {
+            try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: time)], ofItemAtPath: folder.appendingPathComponent(name).path)
+        }
+        var done = false
+        panel.load(path: folder.path, select: nil) { _ in done = true }
+        spin("loaded") { done }
+        func names() -> [String] { panel.rows.map(\.name).filter { $0 != ".." } }
+        panel.sort(by: "date")
+        XCTAssertEqual(names(), ["yeni", "eski", "orta.txt"], "folders first")
+        panel.sort(by: "recent")
+        XCTAssertEqual(names(), ["yeni", "orta.txt", "eski"], "mixed, newest on top")
+    }
+
+    func testPanelFollowsChangesMadeByOtherPrograms() throws {
+        let panel = controller.left
+        XCTAssertFalse(panel.rows.contains { $0.name == "disaridan.txt" })
+        try "x".write(to: root.appendingPathComponent("disaridan.txt"), atomically: true, encoding: .utf8)
+        spin("new file shows up") { panel.rows.contains { $0.name == "disaridan.txt" } }
+        try String(repeating: "y", count: 4000).write(to: root.appendingPathComponent("file.txt"), atomically: false, encoding: .utf8)
+        spin("size updates") { panel.rows.first { $0.name == "file.txt" }?.size == 4000 }
+        try FileManager.default.removeItem(at: root.appendingPathComponent("disaridan.txt"))
+        spin("removed file goes") { !panel.rows.contains { $0.name == "disaridan.txt" } }
+    }
+
+    func testPathBoxEndsWithTheFileUnderTheCursor() throws {
+        controller.activate(controller.left)
+        controller.left.select(name: "file.txt")
+        XCTAssertEqual(controller.pathField.stringValue, root.appendingPathComponent("file.txt").path)
+        controller.left.select(name: "..")
+        XCTAssertEqual(controller.pathField.stringValue, root.path)
+    }
+
+    func testRenameInPlaceRenamesOnlyThatRowAndRefusesTakenNames() throws {
+        let panel = controller.left
+        controller.activate(panel)
+        panel.select(name: "file.txt")
+        let row = panel.table.selectedRow
+        let nameColumn = panel.table.tableColumns.first { $0.identifier.rawValue == "name" }
+        XCTAssertFalse(panel.tableView(panel.table, shouldEdit: nameColumn, row: row), "no typing in names until the slow click")
+        panel.beginRename(row: row)
+        XCTAssertTrue(panel.tableView(panel.table, shouldEdit: nameColumn, row: row))
+        XCTAssertFalse(panel.tableView(panel.table, shouldEdit: nameColumn, row: row - 1))
+        panel.tableView(panel.table, setObjectValue: "yeni.txt", for: nameColumn, row: row)
+        spin("renamed") { panel.rows.contains { $0.name == "yeni.txt" } }
+        XCTAssertFalse(panel.tableView(panel.table, shouldEdit: nameColumn, row: row), "one name only")
+        controller.rename(panel.rows.first { $0.name == "yeni.txt" }!, to: "one", in: panel)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("yeni.txt").path), "a taken name is refused")
+    }
+
     func testF12ShowsTheFolderInFinderWithTheCursorFileSelected() throws {
         var shown: [URL] = []
         controller.revealInFinder = { shown = $0 }

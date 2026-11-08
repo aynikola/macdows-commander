@@ -1,7 +1,7 @@
 import Foundation
 
 public enum OverwritePolicy: String, CaseIterable {
-    case ask, overwrite, newer, skip
+    case ask, overwrite, newer, rename, skip
 }
 
 public struct TransferFile {
@@ -49,9 +49,26 @@ public struct TransferPlan {
         }
     }
 
+    /// Each file that would replace another gets the first free "name (2)" instead. Folders still merge.
+    /// `listing` gives the names already in a destination folder.
+    public mutating func renameConflicts(listing: (String) throws -> [String]) rethrows {
+        var taken: [String: Set<String>] = [:]
+        for conflict in conflicts where !conflict.source.isDirectory && !skipped.contains(conflict.relative) {
+            guard let file = files.first(where: { $0.relative == conflict.relative }) else { continue }
+            let folder = PathUtil.parent(file.destination)
+            if taken[folder] == nil {
+                let planned = files.filter { PathUtil.parent($0.destination) == folder }.map { PathUtil.lastComponent($0.destination) }
+                taken[folder] = Set(try listing(folder) + planned)
+            }
+            let name = Self.freeName(for: PathUtil.lastComponent(file.destination), taken: taken[folder] ?? [])
+            taken[folder]?.insert(name)
+            rename(relative: conflict.relative, to: name)
+        }
+    }
+
     public mutating func applyPolicy(_ policy: OverwritePolicy) {
         switch policy {
-        case .ask, .overwrite:
+        case .ask, .overwrite, .rename:
             break
         case .skip:
             conflicts.forEach { skipped.insert($0.relative) }

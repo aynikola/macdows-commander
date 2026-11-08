@@ -264,6 +264,16 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
         }
         panel.onActivate = { [weak self] in self?.refreshActive() }
         panel.onChromeChange = { [weak self] in self?.showActivePath() }
+        panel.onCursorChange = { [weak self, weak panel] in
+            guard let self, panel === self.active else { return }
+            self.showActivePath()
+        }
+        panel.table.onSlowClick = { [weak panel] row in panel?.beginRename(row: row) }
+        panel.table.onEditEnded = { [weak panel] in panel?.renameEnded() }
+        panel.onInlineRename = { [weak self, weak panel] entry, name in
+            guard let self, let panel else { return }
+            self.rename(entry, to: name, in: panel)
+        }
         panel.onOpen = { [weak self, weak panel] entry in
             guard let self, let panel else { return }
             if let kind = ArchiveKind.detect(entry.name) {
@@ -350,7 +360,7 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
 
     private func handleKey(_ event: NSEvent, panel: PanelController) -> Bool {
         let flags = event.modifierFlags.intersection([.command, .control, .option, .shift])
-        if flags == .control, let key = event.charactersIgnoringModifiers, let order = ["1": "name", "2": "size", "3": "date"][key] {
+        if flags == .control, let key = event.charactersIgnoringModifiers, let order = ["1": "name", "2": "size", "3": "date", "4": "recent"][key] {
             panel.sort(by: order)
             return true
         }
@@ -555,6 +565,7 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
             do {
                 var plan = try TransferPlanner.plan(selection: selection, from: source, sourceDirectory: sourcePath, to: destination, destinationDirectory: destinationPath)
                 plan.applyPolicy(policy)
+                if policy == .rename { try plan.renameConflicts { try destination.list($0).map(\.name) } }
                 DispatchQueue.main.async {
                     guard let self else { return }
                     self.toast.isHidden = true
@@ -1213,9 +1224,15 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
     // MARK: Path box
 
     /// Keeps showing where the active panel is, except while something is being typed there.
+    /// The file under the cursor is added at the end, so the box holds its full path.
     func showActivePath() {
         guard pathField.currentEditor() == nil else { return }
-        pathField.stringValue = active.path
+        let panel = active
+        if let entry = panel.cursorEntry, entry.name != ".." {
+            pathField.stringValue = PathUtil.join(panel.path, entry.name)
+        } else {
+            pathField.stringValue = panel.path
+        }
     }
 
     /// ⌘L: the cursor goes to the path box with the path selected, ready to paste over.
@@ -1246,6 +1263,7 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
     @objc func sortByName(_ sender: Any?) { active.sort(by: "name") }
     @objc func sortBySize(_ sender: Any?) { active.sort(by: "size") }
     @objc func sortByDate(_ sender: Any?) { active.sort(by: "date") }
+    @objc func sortByRecent(_ sender: Any?) { active.sort(by: "recent") }
 
     /// Opens a folder in `panel`, or the folder of a file with the file selected. A relative path starts at the panel's folder.
     func goTo(_ typed: String, in panel: PanelController) {
@@ -1399,6 +1417,8 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
         guard let entry = panel.cursorEntry, !entry.isDirectory else { return }
         if isImage(entry.name) {
             showImages(start: entry, in: panel)
+        } else if MediaViewerController.isMedia(entry.name) {
+            showMedia(start: entry, in: panel)
         } else {
             showText(entry, in: panel)
         }
@@ -1421,6 +1441,21 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
             let target = images[position]
             self.launchEditor(target, in: panel)
         }
+        track(viewer) { viewer.onClosed = $0 }
+    }
+
+    private func showMedia(start entry: FileEntry, in panel: PanelController) {
+        let media = panel.rows.filter { !$0.isDirectory && MediaViewerController.isMedia($0.name) }
+        guard let index = media.firstIndex(where: { $0.name == entry.name }) else { return }
+        let items = media.map { file in
+            ViewerItem(name: file.name, size: file.size, localFolder: panel.source.isRemote ? nil : panel.path) { [weak self, weak panel] done in
+                guard let self, let panel else { done(nil); return }
+                if panel.source.isRemote { self.showToast(L10n.t("status.downloading", file.name)) }
+                self.localCopy(of: file, in: panel, completion: done)
+            }
+        }
+        let viewer = MediaViewerController(items: items, start: index)
+        viewer.onIndexChange = { [weak panel] name in panel?.select(name: name) }
         track(viewer) { viewer.onClosed = $0 }
     }
 
@@ -1660,11 +1695,21 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
         if blockedByArchive(panel) { return }
         guard let entry = panel.cursorEntry, entry.name != ".." else { return }
         askForName(title: L10n.t("rename.title"), value: entry.name, confirm: L10n.t("rename.confirm")) { [weak self] name in
-            let source = panel.source
-            let from = PathUtil.join(panel.path, entry.name)
-            let to = PathUtil.join(panel.path, name)
-            self?.run(panel, select: name) { try source.rename(from: from, to: to) }
+            self?.rename(entry, to: name, in: panel)
         }
+    }
+
+    /// Never over another file: a name already taken is refused.
+    func rename(_ entry: FileEntry, to name: String, in panel: PanelController) {
+        if blockedByArchive(panel) { return }
+        if name.lowercased() != entry.name.lowercased(), panel.rows.contains(where: { $0.name.lowercased() == name.lowercased() }) {
+            showError(L10n.t("rich.existsTitle", name))
+            return
+        }
+        let source = panel.source
+        let from = PathUtil.join(panel.path, entry.name)
+        let to = PathUtil.join(panel.path, name)
+        run(panel, select: name) { try source.rename(from: from, to: to) }
     }
 
     private func deleteSelection() {

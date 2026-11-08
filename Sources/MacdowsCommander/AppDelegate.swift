@@ -105,6 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         viewMenu.addItem(item(t("menu.sortName", []), #selector(MainWindowController.sortByName(_:)), "1"))
         viewMenu.addItem(item(t("menu.sortSize", []), #selector(MainWindowController.sortBySize(_:)), "2"))
         viewMenu.addItem(item(t("menu.sortDate", []), #selector(MainWindowController.sortByDate(_:)), "3"))
+        viewMenu.addItem(item(t("menu.sortRecent", []), #selector(MainWindowController.sortByRecent(_:)), "4"))
         viewMenu.addItem(item(t("menu.pathBox", []), #selector(MainWindowController.focusPathField(_:)), "l"))
         viewMenu.addItem(.separator())
         viewMenu.addItem(item(t("menu.hidden", []), #selector(MainWindowController.toggleHiddenFiles(_:)), ".", [.command, .shift]))

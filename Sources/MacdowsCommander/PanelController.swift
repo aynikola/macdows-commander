@@ -9,17 +9,20 @@ final class PanelTableView: NSTableView {
     var onRightClick: ((Int) -> Void)?
     var onShiftClick: ((Int) -> Void)?
     var onSelectAll: (() -> Void)?
+    /// A second, slower click on the row under the cursor: rename it, as in Finder.
+    var onSlowClick: ((Int) -> Void)?
+    private var slowClick: DispatchWorkItem?
+
+    func cancelSlowClick() {
+        slowClick?.cancel()
+        slowClick = nil
+    }
 
     /// ⌘A from the menu arrives here.
     override func selectAll(_ sender: Any?) { onSelectAll?() }
 
     /// False keeps the muted color, for the panel without the keyboard.
     var isActivePanel = false
-
-    override func keyDown(with event: NSEvent) {
-        if onKey?(event) == true { return }
-        super.keyDown(with: event)
-    }
 
     /// The selection is painted here because cells, left to themselves, draw a grey one over it.
     override func drawBackground(inClipRect clipRect: NSRect) {
@@ -66,7 +69,44 @@ final class PanelTableView: NSTableView {
             if clicked >= 0 { onCommandClick?(clicked) }
             return
         }
+        let clicked = row(at: convert(event.locationInWindow, from: nil))
+        let column = self.column(at: convert(event.locationInWindow, from: nil))
+        // Only a click on the name of the row that was already under the cursor, in the panel that had the keyboard.
+        let wasCursor = event.clickCount == 1 && clicked >= 0 && clicked == selectedRow && window?.firstResponder === self
+            && column >= 0 && tableColumns[column].identifier.rawValue == "name"
+        cancelSlowClick()
         super.mouseDown(with: event)
+        guard wasCursor else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.selectedRow == clicked, self.editedRow < 0 else { return }
+            self.onSlowClick?(clicked)
+        }
+        slowClick = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + NSEvent.doubleClickInterval + 0.05, execute: work)
+    }
+
+    var onEditEnded: (() -> Void)?
+
+    override func textDidEndEditing(_ notification: Notification) {
+        super.textDidEndEditing(notification)
+        // A cell-based table moves on to the next row after Return; renaming stops at one name.
+        if editedRow >= 0 { abortEditing() }
+        onEditEnded?()
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        if editedRow >= 0 {
+            abortEditing()
+            onEditEnded?()
+            return
+        }
+        super.cancelOperation(sender)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        cancelSlowClick()
+        if onKey?(event) == true { return }
+        super.keyDown(with: event)
     }
 }
 
@@ -98,6 +138,11 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
     var onOpen: ((FileEntry) -> Void)?
     var onError: ((String) -> Void)?
     var onPathChange: (() -> Void)?
+    var onCursorChange: (() -> Void)?
+    /// A name typed in place after the slow second click.
+    var onInlineRename: ((FileEntry, String) -> Void)?
+    private var renaming: FileEntry?
+    private let watcher = FolderWatcher()
 
     private(set) var source: FileSource = LocalSource()
     private(set) var site: Site?
@@ -295,11 +340,13 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
             cell.lineBreakMode = column == .name ? .byTruncatingMiddle : .byTruncatingTail
             cell.alignment = right ? .right : .left
             cell.font = mono ? AppFont.digits : AppFont.list()
+            cell.isEditable = column == .name
             item.dataCell = cell
         }
         if let sortKey { item.sortDescriptorPrototype = NSSortDescriptor(key: sortKey, ascending: true) }
-        // Editable columns would swallow double clicks to start renaming in place.
-        item.isEditable = false
+        // Only the name can be typed in, and only after the slow second click: shouldEdit says no otherwise,
+        // so double clicks still open the file.
+        item.isEditable = column == .name
         table.addTableColumn(item)
         table.columnAutoresizingStyle = .noColumnAutoresizing
     }
@@ -463,6 +510,7 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
                     self.path = newPath
                     self.all = entries
                     self.isLoading = false
+                    self.watchFolder()
                     self.rebuild(keeping: select)
                     self.refreshChrome()
                     self.onPathChange?()
@@ -483,17 +531,27 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         load(path: path, select: cursorEntry?.name, completion: completion)
     }
 
+    /// A folder on this Mac is watched, so files that other programs add, change or remove show up by themselves.
+    private func watchFolder() {
+        guard source is LocalSource, !isInArchive else { return watcher.stop() }
+        watcher.watch(path) { [weak self] in
+            guard let self, !self.isLoading, self.table.editedRow < 0 else { return }
+            self.reload()
+        }
+    }
+
     private func rebuild(keeping name: String?) {
         let index = max(0, table.selectedRow)
         var visible = showHidden ? all : all.filter { !$0.isHidden }
         let key = sortKey
         let ascending = ascending
         visible.sort { a, b in
-            if a.isDirectory != b.isDirectory { return a.isDirectory }
+            // "recent" mixes folders and files, the newest of either on top.
+            if key != "recent", a.isDirectory != b.isDirectory { return a.isDirectory }
             let order: Bool
             switch key {
             case "size" where a.size != b.size: order = a.size < b.size
-            case "date" where a.date != b.date: order = (a.date ?? .distantPast) < (b.date ?? .distantPast)
+            case "date" where a.date != b.date, "recent" where a.date != b.date: order = (a.date ?? .distantPast) < (b.date ?? .distantPast)
             default: order = a.name.localizedStandardCompare(b.name) == .orderedAscending
             }
             return ascending ? order : !order
@@ -728,5 +786,38 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
 
     func tableViewSelectionDidChange(_ notification: Notification) {
         table.setNeedsDisplay(table.visibleRect)
+        onCursorChange?()
+    }
+
+    // MARK: Rename in place
+
+    /// Opens the name for typing, with the part before the extension selected.
+    func beginRename(row: Int) {
+        guard row >= 0, row < rows.count, rows[row].name != "..", !isInArchive,
+              let column = table.tableColumns.firstIndex(where: { $0.identifier.rawValue == Column.name.rawValue }) else { return }
+        renaming = rows[row]
+        table.editColumn(column, row: row, with: nil, select: true)
+        if let editor = table.currentEditor() {
+            let name = rows[row].name as NSString
+            let stem = rows[row].isDirectory || name.pathExtension.isEmpty ? name.length : (name.deletingPathExtension as NSString).length
+            editor.selectedRange = NSRange(location: 0, length: stem)
+        }
+    }
+
+    func tableView(_ tableView: NSTableView, shouldEdit tableColumn: NSTableColumn?, row: Int) -> Bool {
+        renaming != nil && row < rows.count && rows[row].name == renaming?.name && tableColumn?.identifier.rawValue == Column.name.rawValue
+    }
+
+    func tableView(_ tableView: NSTableView, setObjectValue object: Any?, for tableColumn: NSTableColumn?, row: Int) {
+        guard let entry = renaming else { return }
+        renaming = nil
+        let name = (object as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name != entry.name, !name.contains("/"), name != ".", name != ".." else { return }
+        onInlineRename?(entry, name)
+    }
+
+    func renameEnded() {
+        renaming = nil
+        table.window?.makeFirstResponder(table)
     }
 }

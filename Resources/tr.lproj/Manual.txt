@@ -15,11 +15,13 @@ Shift+Enter | Arşivin içine girmeden ilişkili programla açmayı sor
 Backspace | Üst klasöre çık
 Ins, Boşluk, sağ tık | Dosyayı işaretle / işareti kaldır
 Shift+tık | İmleçten tıklanan satıra kadar işaretle
+İmleçteki ada yavaşça bir daha tıklamak | Adı yerinde değiştir: Enter kaydeder, Esc vazgeçer
 Ctrl+Q | Klasör boyutu ve bilgi
 Finder'dan sürükle | Panele bırakınca kopyalar, klasör satırına bırakınca içine, ⌘ ile taşır
 ⌘1 veya Ctrl+1 | Ada göre sırala; yine basınca ters çevir
 ⌘2 veya Ctrl+2 | Boyuta göre sırala, önce en büyük
 ⌘3 veya Ctrl+3 | Tarihe göre sırala, önce en yeni
+⌘4 veya Ctrl+4 | En yeni üstte, klasörler ve dosyalar karışık
 ⌘L | En alttaki yol kutusu: yolu yapıştırıp Enter ile gidin, Esc vazgeçer
 Ctrl+A veya ⌘A | Hepsini işaretle; yine basınca işaretleri kaldır
 
@@ -69,7 +71,7 @@ Esc | Aktarımı iptal et
 
 ## F3 önizleme (resim)
 Sağ, Aşağı, Boşluk, Page Down | Sonraki resim
-Sol, Yukarı, Page Up | Önceki resim
+Sol, Yukarı, Backspace, Page Up | Önceki resim
 Home / End | İlk / son resim
 + / - / 0 | Yakınlaştır / uzaklaştır / sığdır
 C | Kırp: sürükleyin, Enter uygular, Esc vazgeçer
@@ -80,6 +82,12 @@ T | Resme yazı: renk, yazı tipi, gölge; resimde sürükleyerek taşınır
 ⌘Z / ⌘⇧Z | Geri al / yinele
 ⌘S | Farklı kaydet: PNG, JPG, WebP
 F4 | Editörde aç
+Esc veya F3 | Kapat
+
+## F3 önizleme (video ve ses)
+Boşluk | Oynat / duraklat
+Sol / Sağ | 5 saniye geri / ileri
+Page Up / Page Down | Önceki / sonraki video
 Esc veya F3 | Kapat
 
 ## F3 önizleme (HTML ve Markdown)

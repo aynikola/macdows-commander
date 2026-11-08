@@ -551,7 +551,7 @@ final class ImageViewerController: NSWindowController, NSWindowDelegate, NSTextF
             onEdit?(index)
         case 124, 125, 121, 49: // right, down, page down, space
             navigate(to: index + 1)
-        case 123, 126, 116: // left, up, page up
+        case 123, 126, 116, 51: // left, up, page up, backspace
             navigate(to: index - 1)
         case 115: navigate(to: 0)
         case 119: navigate(to: items.count - 1)
