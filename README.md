@@ -4,6 +4,8 @@ A native two-panel file manager for macOS, in the spirit of Windows Commander. W
 
 **English** · [Türkçe](README.tr.md)
 
+**[⬇ Download for Mac (DMG, 4.7 MB)](https://github.com/aynikola/macdows-commander/releases/latest/download/Macdows-Commander-1.2.dmg)** · macOS 13+, Apple Silicon and Intel · [all releases](https://github.com/aynikola/macdows-commander/releases)
+
 ![Macdows Commander: file panels, terminal, code editor and image tool](docs/images/hero.jpg)
 
 ## Features
@@ -74,7 +76,7 @@ Press `⌥F1` in the app for every shortcut and the manual, in English or Turkis
 
 ## Download
 
-Get the zip from [Releases](https://github.com/aynikola/macdows-commander/releases/latest), unzip it and move **Macdows Commander** to Applications. It runs on Apple Silicon and Intel Macs with macOS 13 or newer.
+[Download the DMG](https://github.com/aynikola/macdows-commander/releases/latest/download/Macdows-Commander-1.2.dmg), open it and drag **Macdows Commander** onto the **Applications** folder next to it. It runs on Apple Silicon and Intel Macs with macOS 13 or newer. A zip of the app is also on the [Releases](https://github.com/aynikola/macdows-commander/releases/latest) page.
 
 The app isn't signed by an Apple developer account yet, so macOS asks once before opening it:
 
@@ -90,7 +92,7 @@ scripts/build-app.sh
 open "build/Macdows Commander.app"
 ```
 
-`scripts/package.sh` builds the app and zips it into `build/` for sharing.
+`scripts/package.sh` builds the app and puts a DMG and a zip in `build/` for sharing. The DMG window with the arrow to Applications needs `pip install dmgbuild`; without it the DMG is plain.
 
 If F keys change the brightness or volume on your Mac, press them with `Fn`, or turn on standard function keys in System Settings.
 

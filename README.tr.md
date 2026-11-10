@@ -4,6 +4,8 @@ macOS için Windows Commander ruhunda, iki panelli yerel dosya yöneticisi. Swif
 
 [English](README.md) · **Türkçe**
 
+**[⬇ Mac için indir (DMG, 4.7 MB)](https://github.com/aynikola/macdows-commander/releases/latest/download/Macdows-Commander-1.2.dmg)** · macOS 13+, Apple Silicon ve Intel · [tüm sürümler](https://github.com/aynikola/macdows-commander/releases)
+
 ![Macdows Commander: dosya panelleri, terminal, kod editörü ve resim aracı](docs/images/hero.jpg)
 
 ## Özellikler
@@ -74,7 +76,7 @@ Tüm kısayollar ve kılavuz için uygulamada `⌥F1`'e basın; Türkçe ve İng
 
 ## İndirme
 
-Zip'i [Releases](https://github.com/aynikola/macdows-commander/releases/latest) sayfasından indirin, açın ve **Macdows Commander**'ı Uygulamalar klasörüne taşıyın. macOS 13 veya üstündeki Apple Silicon ve Intel Mac'lerde çalışır.
+[DMG'yi indirin](https://github.com/aynikola/macdows-commander/releases/latest/download/Macdows-Commander-1.2.dmg), açın ve **Macdows Commander**'ı yanındaki **Applications** (Uygulamalar) klasörünün üstüne sürükleyin. macOS 13 veya üstündeki Apple Silicon ve Intel Mac'lerde çalışır. Uygulamanın zip'i de [Releases](https://github.com/aynikola/macdows-commander/releases/latest) sayfasında.
 
 Uygulama henüz bir Apple geliştirici hesabıyla imzalı değil, bu yüzden macOS ilk açılışta bir kez sorar:
 
@@ -90,7 +92,7 @@ scripts/build-app.sh
 open "build/Macdows Commander.app"
 ```
 
-`scripts/package.sh` uygulamayı derleyip paylaşmak için `build/` içine zip'ler.
+`scripts/package.sh` uygulamayı derleyip paylaşmak için `build/` içine bir DMG ve bir zip koyar. DMG'deki Applications okunu gösteren pencere için `pip install dmgbuild` gerekir; o yoksa DMG düz olur.
 
 F tuşları Mac'inizde parlaklık veya sesi değiştiriyorsa `Fn` ile basın ya da Sistem Ayarları'ndan standart işlev tuşlarını açın.
 

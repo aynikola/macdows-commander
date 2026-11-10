@@ -2,8 +2,8 @@
 # Builds "build/Macdows Commander.app" for both Apple Silicon and Intel Macs.
 set -euo pipefail
 
-VERSION="1.1"
-BUILD="2"
+VERSION="1.2"
+BUILD="3"
 
 cd "$(dirname "$0")/.."
 # Each architecture builds on its own, then lipo joins them into one program.
