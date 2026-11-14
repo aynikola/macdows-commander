@@ -15,8 +15,11 @@ macOS için Windows Commander ruhunda, iki panelli yerel dosya yöneticisi. Swif
 - `Ins` veya `Boşluk` işaretler, `Shift`+tık aralık işaretler, `Ctrl+A` hepsini işaretler
 - `F5` kopyalar, `F6` taşır, `F7` klasör, `Shift+F7` metin, HTML veya Markdown dosyası açar, `F8` siler
 - Var olan dosyanın üzerine sormadan yazılmaz; kopyayı yeniden adlandırabilirsiniz
+- Ada yavaşça ikinci kez tıklayınca yerinde yeniden adlandırılır
+- Başka bir program klasörü değiştirince paneller kendiliğinden yenilenir
 - `F2` aynı klasörü diğer panelde açar, alttaki yol kutusuna yol yapıştırıp Enter ile gidilir
-- `⌘1`, `⌘2`, `⌘3` ada, boyuta ve tarihe göre sıralar
+- `⌘1`, `⌘2`, `⌘3` ada, boyuta ve tarihe göre sıralar; `⌘4` en yeniyi üste alır, klasör ve dosya karışık
+- `F3` metin, HTML, Markdown, resim, PDF, video ve ses önizler
 - Finder'dan dosya sürükleyip bırakabilir, Finder'a sürükleyebilirsiniz
 - Ad ve içerik araması, zip ve tar arşivlerine girme, favori klasörler
 - `F11` Mac'in paylaşım menüsünü açar, `⌥F3` iki dosyayı karşılaştırır

@@ -118,7 +118,9 @@ FTP's Automatic mode tries passive first and moves to active if that fails, so i
 For machines without FTP, choose SSH. The program uses SFTP and moves to SCP by itself when SFTP is off. Leave the password empty to use your SSH keys.
 
 ## Sending files
-Mark files with Ins, Space or right click, then press F5. With nothing marked, the file under the cursor goes. A file with the same name at the target is never overwritten without asking.
+Mark files with Ins, Space or right click, then press F5. With nothing marked, the file under the cursor goes. A file with the same name at the target is never overwritten without asking. Under "If a file exists" you can also pick "Rename the new file": each one then lands as a (2).txt, the first free name.
+
+Folders on this Mac refresh by themselves when another program adds, changes or removes files. Folders on a server need ⌘R. The path box at the bottom shows the full path of the file under the cursor.
 Transfers queue in the background and show their progress in the list at the bottom.
 
 ## Editor

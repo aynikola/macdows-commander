@@ -15,8 +15,11 @@ A native two-panel file manager for macOS, in the spirit of Windows Commander. W
 - `Ins` or `Space` marks, `Shift`+click marks a range, `Ctrl+A` marks everything
 - `F5` copies, `F6` moves, `F7` makes a folder, `Shift+F7` makes a text, HTML or Markdown file, `F8` deletes
 - A file that already exists is never replaced without asking, and you can rename the copy instead
+- A second, slower click on a name renames it in place
+- Panels refresh by themselves when another program changes the folder
 - `F2` opens the same folder in the other panel, and the path box at the bottom takes a pasted path
-- `⌘1`, `⌘2` and `⌘3` sort by name, size and date
+- `⌘1`, `⌘2` and `⌘3` sort by name, size and date; `⌘4` puts the newest on top with folders and files mixed
+- `F3` previews text, HTML, Markdown, images, PDF, video and sound
 - Drag files in from Finder, or out to it
 - Search by name and content, browse zip and tar archives, keep favorite folders
 - `F11` opens the Mac's share menu, and `⌥F3` compares two files

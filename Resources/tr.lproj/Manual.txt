@@ -118,7 +118,9 @@ FTP'de Otomatik modu önce passive dener, olmazsa active moda geçer; çoğu zam
 FTP olmayan makineler için SSH seçin. Program SFTP kullanır, SFTP kapalıysa kendiliğinden SCP'ye geçer. SSH anahtarınızı kullanmak için parolayı boş bırakın.
 
 ## Dosya gönderme
-Dosyaları Ins, Boşluk veya sağ tık ile işaretleyin, F5'e basın. Hiçbir şey işaretli değilse imlecin üstündeki dosya gider. Hedefte aynı adlı dosya varsa sormadan üstüne yazılmaz.
+Dosyaları Ins, Boşluk veya sağ tık ile işaretleyin, F5'e basın. Hiçbir şey işaretli değilse imlecin üstündeki dosya gider. Hedefte aynı adlı dosya varsa sormadan üstüne yazılmaz. "Dosya varsa" listesinden "Yeni dosyayı yeniden adlandır"ı da seçebilirsiniz: her dosya a (2).txt gibi boştaki ilk adla gelir.
+
+Bu Mac'teki klasörler, başka bir program dosya ekleyince, değiştirince veya silince kendiliğinden yenilenir. Sunucudaki klasörler için ⌘R gerekir. Alttaki yol kutusu imlecin üstündeki dosyanın tam yolunu gösterir.
 Aktarımlar arka planda sıraya girer ve ilerlemesi alttaki listede görünür.
 
 ## Editör
