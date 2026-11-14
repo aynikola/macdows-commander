@@ -8,6 +8,8 @@ public struct FileEntry: Equatable {
     public var date: Date?
     public var permissions: String?
     public var owner: String?
+    /// Finder tags, on files of this Mac only.
+    public var tags: [FileTag] = []
 
     public init(name: String, isDirectory: Bool, isSymlink: Bool = false, size: Int64 = 0, date: Date? = nil, permissions: String? = nil, owner: String? = nil) {
         self.name = name
@@ -20,6 +22,40 @@ public struct FileEntry: Equatable {
     }
 
     public var isHidden: Bool { name.hasPrefix(".") }
+}
+
+/// A Finder tag. `color` is Finder's label number: 0 none, 1 gray, 2 green, 3 purple, 4 blue, 5 yellow, 6 red, 7 orange.
+public struct FileTag: Equatable {
+    public var name: String
+    public var color: Int
+
+    public init(name: String, color: Int) {
+        self.name = name
+        self.color = color
+    }
+
+    /// Finder keeps tags in an extended attribute: a property list of "Name\nColor" strings.
+    public static let attribute = "com.apple.metadata:_kMDItemUserTags"
+
+    public static func parse(_ data: Data) -> [FileTag] {
+        guard let list = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String] else { return [] }
+        return list.compactMap { item in
+            let parts = item.components(separatedBy: "\n")
+            guard let name = parts.first, !name.isEmpty else { return nil }
+            let color = parts.count > 1 ? Int(parts[1]) ?? 0 : 0
+            return FileTag(name: name, color: (0...7).contains(color) ? color : 0)
+        }
+    }
+
+    /// Reads the tags of a file without following a link. Most files have none, and then this is one quick call.
+    public static func read(path: String) -> [FileTag] {
+        let size = getxattr(path, attribute, nil, 0, 0, XATTR_NOFOLLOW)
+        guard size > 0 else { return [] }
+        var data = Data(count: size)
+        let read = data.withUnsafeMutableBytes { getxattr(path, attribute, $0.baseAddress, size, 0, XATTR_NOFOLLOW) }
+        guard read > 0 else { return [] }
+        return parse(data.prefix(read))
+    }
 }
 
 public enum SiteProtocol: String, Codable, CaseIterable {

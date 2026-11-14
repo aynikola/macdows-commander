@@ -206,3 +206,25 @@ final class LineDiffTests: XCTestCase {
         XCTAssertEqual(LineDiff.lines(of: "a\n\n"), ["a", ""])
     }
 }
+
+final class FileTagTests: XCTestCase {
+    func testTagsAreReadFromTheFileAndListed() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("etiketli.txt")
+        try Data("x".utf8).write(to: file)
+        try Data("y".utf8).write(to: folder.appendingPathComponent("sade.txt"))
+        let plist = try PropertyListSerialization.data(fromPropertyList: ["Red\n6", "Proje", "Green\n2"], format: .binary, options: 0)
+        let result = plist.withUnsafeBytes { setxattr(file.path, FileTag.attribute, $0.baseAddress, plist.count, 0, 0) }
+        XCTAssertEqual(result, 0)
+        let entries = try LocalSource().list(folder.path)
+        XCTAssertEqual(entries.first { $0.name == "etiketli.txt" }?.tags, [FileTag(name: "Red", color: 6), FileTag(name: "Proje", color: 0), FileTag(name: "Green", color: 2)])
+        XCTAssertEqual(entries.first { $0.name == "sade.txt" }?.tags, [])
+    }
+
+    func testBadTagDataGivesNoTags() {
+        XCTAssertEqual(FileTag.parse(Data("bozuk".utf8)), [])
+        XCTAssertEqual(FileTag.parse(try! PropertyListSerialization.data(fromPropertyList: ["Mor\n99"], format: .xml, options: 0)), [FileTag(name: "Mor", color: 0)])
+    }
+}

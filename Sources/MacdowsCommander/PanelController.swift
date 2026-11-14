@@ -110,6 +110,44 @@ final class PanelTableView: NSTableView {
     }
 }
 
+/// The name, with a dot for each colored Finder tag after it, as in Finder.
+final class TaggedNameCell: NSTextFieldCell {
+    var tagColors: [NSColor] = []
+
+    private static let dot: CGFloat = 8
+    private static let overlap: CGFloat = 3
+
+    override func copy(with zone: NSZone? = nil) -> Any {
+        let copy = super.copy(with: zone) as! TaggedNameCell
+        copy.tagColors = tagColors
+        return copy
+    }
+
+    private var dotsWidth: CGFloat {
+        tagColors.isEmpty ? 0 : CGFloat(tagColors.count) * (Self.dot - Self.overlap) + Self.overlap + 6
+    }
+
+    override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
+        guard !tagColors.isEmpty else { return super.drawInterior(withFrame: cellFrame, in: controlView) }
+        var textFrame = cellFrame
+        let textWidth = min(cellSize(forBounds: cellFrame).width, cellFrame.width - dotsWidth)
+        textFrame.size.width = max(0, textWidth)
+        super.drawInterior(withFrame: textFrame, in: controlView)
+        var x = textFrame.maxX + 4
+        let y = cellFrame.midY - Self.dot / 2
+        for color in tagColors {
+            let circle = NSBezierPath(ovalIn: NSRect(x: x, y: y, width: Self.dot, height: Self.dot))
+            color.setFill()
+            circle.fill()
+            // A thin ring keeps the dot visible on the selection color and on a background of the same color.
+            Theme.background.setStroke()
+            circle.lineWidth = 1
+            circle.stroke()
+            x += Self.dot - Self.overlap
+        }
+    }
+}
+
 /// Column titles on the cream surface instead of the system's white.
 private final class ThemedHeaderCell: NSTableHeaderCell {
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {
@@ -336,7 +374,7 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         } else {
             item.minWidth = 40
             item.resizingMask = column == .name ? [.autoresizingMask, .userResizingMask] : [.userResizingMask]
-            let cell = NSTextFieldCell()
+            let cell = column == .name ? TaggedNameCell() : NSTextFieldCell()
             cell.lineBreakMode = column == .name ? .byTruncatingMiddle : .byTruncatingTail
             cell.alignment = right ? .right : .left
             cell.font = mono ? AppFont.digits : AppFont.list()
@@ -768,6 +806,17 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         }
         if tableColumn?.identifier.rawValue == Column.name.rawValue {
             text.font = AppFont.list(bold: isMarked)
+            (text as? TaggedNameCell)?.tagColors = Self.colors(for: entry.tags)
+        }
+    }
+
+    /// Finder's own colors for its label numbers, so a red tag looks the same here and in Finder.
+    static func colors(for tags: [FileTag]) -> [NSColor] {
+        let palette = NSWorkspace.shared.fileLabelColors
+        var seen = Set<Int>()
+        return tags.compactMap { tag in
+            guard tag.color > 0, tag.color < palette.count, seen.insert(tag.color).inserted else { return nil }
+            return palette[tag.color]
         }
     }
 

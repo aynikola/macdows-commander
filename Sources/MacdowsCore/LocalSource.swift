@@ -19,7 +19,7 @@ public final class LocalSource: FileSource {
         var info = link
         if isLink, stat(full, &info) != 0 { info = link }
         let isDirectory = (info.st_mode & S_IFMT) == S_IFDIR
-        return FileEntry(
+        var result = FileEntry(
             name: name,
             isDirectory: isDirectory,
             isSymlink: isLink,
@@ -28,6 +28,8 @@ public final class LocalSource: FileSource {
             permissions: LocalSource.permissionString(link.st_mode),
             owner: ownerName(link.st_uid)
         )
+        result.tags = FileTag.read(path: full)
+        return result
     }
 
     private func ownerName(_ uid: uid_t) -> String {

@@ -506,6 +506,12 @@ final class MainWindowTests: XCTestCase {
         XCTAssertEqual(press("q"), "İzmir.txt", "no match leaves the cursor")
     }
 
+    func testTagDotsUseFindersColorsOnceEach() {
+        let palette = NSWorkspace.shared.fileLabelColors
+        let colors = PanelController.colors(for: [FileTag(name: "Red", color: 6), FileTag(name: "Proje", color: 0), FileTag(name: "Kirmizi", color: 6), FileTag(name: "Blue", color: 4)])
+        XCTAssertEqual(colors, [palette[6], palette[4]])
+    }
+
     func testManualLinksToGitHub() {
         let rendered = HelpWindowController.render("See https://github.com/aynikola/macdows-commander here")
         let start = (rendered.string as NSString).range(of: "https://").location

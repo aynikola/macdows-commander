@@ -17,6 +17,7 @@ A native two-panel file manager for macOS, in the spirit of Windows Commander. W
 - A file that already exists is never replaced without asking, and you can rename the copy instead
 - A second, slower click on a name renames it in place
 - Panels refresh by themselves when another program changes the folder
+- Finder's colored tags show as dots after the name
 - `F2` opens the same folder in the other panel, and the path box at the bottom takes a pasted path
 - `⌘1`, `⌘2` and `⌘3` sort by name, size and date; `⌘4` puts the newest on top with folders and files mixed
 - `F3` previews text, HTML, Markdown, images, PDF, video and sound

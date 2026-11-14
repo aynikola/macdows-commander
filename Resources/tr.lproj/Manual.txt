@@ -17,6 +17,7 @@ Shift+Enter | Arşivin içine girmeden ilişkili programla açmayı sor
 Backspace | Üst klasöre çık
 Ins, Boşluk, sağ tık | Dosyayı işaretle / işareti kaldır
 Shift+tık | İmleçten tıklanan satıra kadar işaretle
+Renkli noktalar | Finder etiketleri: adın yanında her etiketin renginde bir nokta
 İmleçteki ada yavaşça bir daha tıklamak | Adı yerinde değiştir: Enter kaydeder, Esc vazgeçer
 Ctrl+Q | Klasör boyutu ve bilgi
 Finder'dan sürükle | Panele bırakınca kopyalar, klasör satırına bırakınca içine, ⌘ ile taşır

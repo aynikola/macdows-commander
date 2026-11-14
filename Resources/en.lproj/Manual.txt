@@ -17,6 +17,7 @@ Shift+Enter | Offer the associated app instead of looking inside an archive
 Backspace | Go to the parent folder
 Ins, Space, right click | Mark / unmark a file
 Shift+click | Mark from the cursor to the clicked row
+Colored dots | Finder tags: a dot in each tag's color after the name
 Second, slower click on the cursor's name | Rename in place: Enter saves, Esc cancels
 Ctrl+Q | Folder size and info
 Drag from Finder | Dropping on a panel copies, on a folder row copies into it, with ⌘ moves
