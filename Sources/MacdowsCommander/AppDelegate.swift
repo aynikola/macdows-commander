@@ -34,6 +34,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     @objc private func showHelp(_ sender: Any?) { HelpWindowController.show() }
+    @objc private func openGitHub(_ sender: Any?) { NSWorkspace.shared.open(AppVersion.repository) }
+    @objc private func openReleases(_ sender: Any?) { NSWorkspace.shared.open(AppVersion.releases) }
+
+    /// The standard panel, with the GitHub page as a link under the version.
+    @objc private func showAbout(_ sender: Any?) {
+        let style = NSMutableParagraphStyle()
+        style.alignment = .center
+        let link = AppVersion.repository.absoluteString.replacingOccurrences(of: "https://", with: "")
+        let credits = NSAttributedString(string: link, attributes: [
+            .link: AppVersion.repository,
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+            .paragraphStyle: style,
+        ])
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
+        NSApp.activate(ignoringOtherApps: true)
+    }
     @objc private func biggerText(_ sender: Any?) { AppFont.size += 1 }
     @objc private func smallerText(_ sender: Any?) { AppFont.size -= 1 }
     @objc private func defaultText(_ sender: Any?) { AppFont.size = AppFont.defaultSize }
@@ -74,7 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let main = NSMenu()
 
         let appMenu = NSMenu()
-        appMenu.addItem(item(t("menu.about", []), #selector(NSApplication.orderFrontStandardAboutPanel(_:))))
+        appMenu.addItem(item(t("menu.about", []), #selector(showAbout(_:)), target: self))
         appMenu.addItem(.separator())
         appMenu.addItem(item(t("menu.hide", []), #selector(NSApplication.hide(_:)), "h"))
         appMenu.addItem(item(t("menu.quit", []), #selector(NSApplication.terminate(_:)), "q"))
@@ -158,6 +174,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         helpAlternate.isHidden = true
         helpAlternate.allowsKeyEquivalentWhenHidden = true
         helpMenu.addItem(helpAlternate)
+        helpMenu.addItem(.separator())
+        helpMenu.addItem(item(t("menu.github", []), #selector(openGitHub(_:)), target: self))
+        helpMenu.addItem(item(t("menu.latest", []), #selector(openReleases(_:)), target: self))
 
         for submenu in [appMenu, fileMenu, editMenu, viewMenu, languageMenu, helpMenu] {
             let holder = NSMenuItem()

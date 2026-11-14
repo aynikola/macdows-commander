@@ -263,6 +263,8 @@
 "top.help" = "Help ⌥F1";
 "menu.help" = "Help";
 "menu.helpItem" = "Shortcuts and Manual";
+"menu.github" = "Macdows Commander on GitHub";
+"menu.latest" = "Download the Latest Version";
 "help.title" = "Macdows Commander: Shortcuts and Manual";
 "edit.goTo" = "Go to Line ⌃G";
 "edit.goToTitle" = "Go to line (1 to %@)";

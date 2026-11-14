@@ -1,5 +1,7 @@
 # Kısayollar
 
+Kodlar, indirmeler ve hata bildirimleri: https://github.com/aynikola/macdows-commander
+
 Mac klavyede F tuşları parlaklık ve ses gibi işler yapıyorsa Fn ile birlikte basın. Sistem Ayarları > Klavye bölümünden F tuşlarını varsayılan yapabilirsiniz.
 
 ## Paneller

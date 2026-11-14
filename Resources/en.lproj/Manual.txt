@@ -1,5 +1,7 @@
 # Shortcuts
 
+The code, downloads and bug reports are at https://github.com/aynikola/macdows-commander
+
 If F keys on your Mac change brightness or volume, press them with Fn. System Settings > Keyboard can make them standard function keys.
 
 ## Panels

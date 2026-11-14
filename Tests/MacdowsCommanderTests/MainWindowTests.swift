@@ -506,6 +506,12 @@ final class MainWindowTests: XCTestCase {
         XCTAssertEqual(press("q"), "İzmir.txt", "no match leaves the cursor")
     }
 
+    func testManualLinksToGitHub() {
+        let rendered = HelpWindowController.render("See https://github.com/aynikola/macdows-commander here")
+        let start = (rendered.string as NSString).range(of: "https://").location
+        XCTAssertEqual(rendered.attribute(.link, at: start, effectiveRange: nil) as? URL, AppVersion.repository)
+    }
+
     func testManualHasEveryLanguageAndRenders() throws {
         let resources = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources")
         for language in ["en", "tr"] {

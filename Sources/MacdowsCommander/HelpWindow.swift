@@ -73,7 +73,15 @@ final class HelpWindowController: NSWindowController, NSWindowDelegate {
                 result.append(NSAttributedString(string: String(line[..<separator.lowerBound]), attributes: [.font: NSFont(name: AppFont.monoFamily, size: size - 1) ?? .monospacedSystemFont(ofSize: size - 1, weight: .regular), .foregroundColor: Theme.accent, .paragraphStyle: style]))
                 result.append(NSAttributedString(string: "\t" + line[separator.upperBound...] + "\n", attributes: [.font: body, .foregroundColor: Theme.text, .paragraphStyle: style]))
             } else if !line.trimmingCharacters(in: .whitespaces).isEmpty {
-                result.append(NSAttributedString(string: line + "\n", attributes: [.font: body, .foregroundColor: Theme.text, .paragraphStyle: style]))
+                let text = NSMutableAttributedString(string: line + "\n", attributes: [.font: body, .foregroundColor: Theme.text, .paragraphStyle: style])
+                // Addresses in the manual open in the browser.
+                if let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) {
+                    for match in detector.matches(in: line, range: NSRange(location: 0, length: (line as NSString).length)) {
+                        guard let url = match.url else { continue }
+                        text.addAttributes([.link: url, .foregroundColor: Theme.accent], range: match.range)
+                    }
+                }
+                result.append(text)
             }
         }
         return result

@@ -263,6 +263,8 @@
 "top.help" = "Yardım ⌥F1";
 "menu.help" = "Yardım";
 "menu.helpItem" = "Kısayollar ve Kılavuz";
+"menu.github" = "GitHub'da Macdows Commander";
+"menu.latest" = "En Son Sürümü İndir";
 "help.title" = "Macdows Commander: Kısayollar ve Kılavuz";
 "edit.goTo" = "Satıra Git ⌃G";
 "edit.goToTitle" = "Satıra git (1 ile %@ arası)";
