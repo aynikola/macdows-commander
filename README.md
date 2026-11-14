@@ -4,7 +4,7 @@ A native two-panel file manager for macOS, in the spirit of Windows Commander. W
 
 **English** · [Türkçe](README.tr.md)
 
-**[⬇ Download for Mac (DMG, 4.7 MB)](https://github.com/aynikola/macdows-commander/releases/latest/download/Macdows-Commander-1.2.dmg)** · macOS 13+, Apple Silicon and Intel · [all releases](https://github.com/aynikola/macdows-commander/releases)
+**[⬇ Download for Mac (DMG, 4.7 MB)](https://github.com/aynikola/macdows-commander/releases/latest/download/Macdows-Commander-1.2.1.dmg)** · macOS 13+, Apple Silicon and Intel · [all releases](https://github.com/aynikola/macdows-commander/releases)
 
 ![Macdows Commander: file panels, terminal, code editor and image tool](docs/images/hero.jpg)
 
@@ -79,7 +79,7 @@ Press `⌥F1` in the app for every shortcut and the manual, in English or Turkis
 
 ## Download
 
-[Download the DMG](https://github.com/aynikola/macdows-commander/releases/latest/download/Macdows-Commander-1.2.dmg), open it and drag **Macdows Commander** onto the **Applications** folder next to it. It runs on Apple Silicon and Intel Macs with macOS 13 or newer. A zip of the app is also on the [Releases](https://github.com/aynikola/macdows-commander/releases/latest) page.
+[Download the DMG](https://github.com/aynikola/macdows-commander/releases/latest/download/Macdows-Commander-1.2.1.dmg), open it and drag **Macdows Commander** onto the **Applications** folder next to it. It runs on Apple Silicon and Intel Macs with macOS 13 or newer. A zip of the app is also on the [Releases](https://github.com/aynikola/macdows-commander/releases/latest) page.
 
 The app isn't signed by an Apple developer account yet, so macOS asks once before opening it:
 

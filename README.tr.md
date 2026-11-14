@@ -4,7 +4,7 @@ macOS için Windows Commander ruhunda, iki panelli yerel dosya yöneticisi. Swif
 
 [English](README.md) · **Türkçe**
 
-**[⬇ Mac için indir (DMG, 4.7 MB)](https://github.com/aynikola/macdows-commander/releases/latest/download/Macdows-Commander-1.2.dmg)** · macOS 13+, Apple Silicon ve Intel · [tüm sürümler](https://github.com/aynikola/macdows-commander/releases)
+**[⬇ Mac için indir (DMG, 4.7 MB)](https://github.com/aynikola/macdows-commander/releases/latest/download/Macdows-Commander-1.2.1.dmg)** · macOS 13+, Apple Silicon ve Intel · [tüm sürümler](https://github.com/aynikola/macdows-commander/releases)
 
 ![Macdows Commander: dosya panelleri, terminal, kod editörü ve resim aracı](docs/images/hero.jpg)
 
@@ -79,7 +79,7 @@ Tüm kısayollar ve kılavuz için uygulamada `⌥F1`'e basın; Türkçe ve İng
 
 ## İndirme
 
-[DMG'yi indirin](https://github.com/aynikola/macdows-commander/releases/latest/download/Macdows-Commander-1.2.dmg), açın ve **Macdows Commander**'ı yanındaki **Applications** (Uygulamalar) klasörünün üstüne sürükleyin. macOS 13 veya üstündeki Apple Silicon ve Intel Mac'lerde çalışır. Uygulamanın zip'i de [Releases](https://github.com/aynikola/macdows-commander/releases/latest) sayfasında.
+[DMG'yi indirin](https://github.com/aynikola/macdows-commander/releases/latest/download/Macdows-Commander-1.2.1.dmg), açın ve **Macdows Commander**'ı yanındaki **Applications** (Uygulamalar) klasörünün üstüne sürükleyin. macOS 13 veya üstündeki Apple Silicon ve Intel Mac'lerde çalışır. Uygulamanın zip'i de [Releases](https://github.com/aynikola/macdows-commander/releases/latest) sayfasında.
 
 Uygulama henüz bir Apple geliştirici hesabıyla imzalı değil, bu yüzden macOS ilk açılışta bir kez sorar:
 
