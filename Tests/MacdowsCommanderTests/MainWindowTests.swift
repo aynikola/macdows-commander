@@ -506,10 +506,17 @@ final class MainWindowTests: XCTestCase {
         XCTAssertEqual(press("q"), "İzmir.txt", "no match leaves the cursor")
     }
 
-    func testTagDotsUseFindersColorsOnceEach() {
-        let palette = NSWorkspace.shared.fileLabelColors
-        let colors = PanelController.colors(for: [FileTag(name: "Red", color: 6), FileTag(name: "Proje", color: 0), FileTag(name: "Kirmizi", color: 6), FileTag(name: "Blue", color: 4)])
-        XCTAssertEqual(colors, [palette[6], palette[4]])
+    func testTagDotsCountEachColorOnceAndSurviveCopyingTheCell() {
+        let bits = TaggedNameCell.bits(for: [FileTag(name: "Red", color: 6), FileTag(name: "Proje", color: 0), FileTag(name: "Kirmizi", color: 6), FileTag(name: "Blue", color: 4)])
+        XCTAssertEqual(bits, (1 << 6) | (1 << 4))
+        // AppKit copies cells while clicking rows; with tags set this once crashed the app.
+        let cell = TaggedNameCell()
+        for round in 0..<200 {
+            cell.tagBits = round.isMultiple(of: 2) ? bits : 0
+            let copy = cell.copy() as! TaggedNameCell
+            copy.tagBits = TaggedNameCell.bits(for: [FileTag(name: "Green", color: 2)])
+            XCTAssertEqual(cell.tagBits, round.isMultiple(of: 2) ? bits : 0)
+        }
     }
 
     func testManualLinksToGitHub() {

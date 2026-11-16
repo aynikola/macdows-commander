@@ -112,22 +112,29 @@ final class PanelTableView: NSTableView {
 
 /// The name, with a dot for each colored Finder tag after it, as in Finder.
 final class TaggedNameCell: NSTextFieldCell {
-    var tagColors: [NSColor] = []
+    /// One bit per Finder label number (1 to 7). A plain number on purpose: AppKit copies a cell byte for byte,
+    /// and a Swift array or object stored here would then be released once too often and crash the app.
+    var tagBits: UInt8 = 0
 
     private static let dot: CGFloat = 8
     private static let overlap: CGFloat = 3
 
-    override func copy(with zone: NSZone? = nil) -> Any {
-        let copy = super.copy(with: zone) as! TaggedNameCell
-        copy.tagColors = tagColors
-        return copy
+    private var tagColors: [NSColor] {
+        let palette = NSWorkspace.shared.fileLabelColors
+        return (1..<8).filter { tagBits & (1 << UInt8($0)) != 0 && $0 < palette.count }.map { palette[$0] }
+    }
+
+    static func bits(for tags: [FileTag]) -> UInt8 {
+        tags.reduce(0) { $1.color > 0 && $1.color < 8 ? $0 | (1 << UInt8($1.color)) : $0 }
     }
 
     private var dotsWidth: CGFloat {
-        tagColors.isEmpty ? 0 : CGFloat(tagColors.count) * (Self.dot - Self.overlap) + Self.overlap + 6
+        let count = tagColors.count
+        return count == 0 ? 0 : CGFloat(count) * (Self.dot - Self.overlap) + Self.overlap + 6
     }
 
     override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
+        let tagColors = self.tagColors
         guard !tagColors.isEmpty else { return super.drawInterior(withFrame: cellFrame, in: controlView) }
         var textFrame = cellFrame
         let textWidth = min(cellSize(forBounds: cellFrame).width, cellFrame.width - dotsWidth)
@@ -806,17 +813,7 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         }
         if tableColumn?.identifier.rawValue == Column.name.rawValue {
             text.font = AppFont.list(bold: isMarked)
-            (text as? TaggedNameCell)?.tagColors = Self.colors(for: entry.tags)
-        }
-    }
-
-    /// Finder's own colors for its label numbers, so a red tag looks the same here and in Finder.
-    static func colors(for tags: [FileTag]) -> [NSColor] {
-        let palette = NSWorkspace.shared.fileLabelColors
-        var seen = Set<Int>()
-        return tags.compactMap { tag in
-            guard tag.color > 0, tag.color < palette.count, seen.insert(tag.color).inserted else { return nil }
-            return palette[tag.color]
+            (text as? TaggedNameCell)?.tagBits = TaggedNameCell.bits(for: entry.tags)
         }
     }
 
