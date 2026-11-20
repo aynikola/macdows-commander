@@ -50,3 +50,17 @@ public final class FavoritesStore {
         save(load().filter { $0.id != id })
     }
 }
+
+/// Where each panel was when the app was last used, so the next start opens the same folders.
+public enum LastFolders {
+    /// The saved folder if it is still there. Otherwise the nearest folder above it that is, and the home folder as a last resort.
+    public static func resolve(saved: String?, home: String, fileManager: FileManager = .default) -> String {
+        guard var path = saved, path.hasPrefix("/") else { return home }
+        var isDirectory: ObjCBool = false
+        while path != "/" {
+            if fileManager.fileExists(atPath: path, isDirectory: &isDirectory), isDirectory.boolValue { return path }
+            path = (path as NSString).deletingLastPathComponent
+        }
+        return home
+    }
+}

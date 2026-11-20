@@ -17,6 +17,8 @@ Shift+Enter | Arşivin içine girmeden ilişkili programla açmayı sor
 Backspace | Üst klasöre çık
 Ins, Boşluk, sağ tık | Dosyayı işaretle / işareti kaldır
 Shift+tık | İmleçten tıklanan satıra kadar işaretle
+Paneller arasındaki çubuğu sürükleme | Bir panele daha çok yer verir; çubuğa çift tıklayınca paneller eşitlenir. Bir sonraki açılışta da korunur
+Son klasörler | Uygulama, kapattığınızda panellerin bulunduğu klasörlerde açılır (sunucudaki klasörler hariç)
 Renkli noktalar | Finder etiketleri: adın yanında her etiketin renginde bir nokta
 İmleçteki ada yavaşça bir daha tıklamak | Adı yerinde değiştir: Enter kaydeder, Esc vazgeçer
 Ctrl+Q | Klasör boyutu ve bilgi
@@ -51,7 +53,8 @@ Shift+F9 | Ayrı Terminal penceresi
 ⌥F1 | Bu pencere (⌘? de açar)
 ⌥F5 | Sıkıştırıp diğer panele gönder
 ⌥F7 | Dosya ve içerik araması (⌘F de açar)
-⌥F9 | Terminal için kayıtlı SSH bağlantıları
+⌥F9 | Kayıtlı sunucular (FTP, FTPS, SFTP): etkin paneli bağlar, 1-9 ile seçilir
+⌥F10 | Terminal bağlantıları: kayıtlı SSH sunucuları ve bu Mac, alttaki terminal için
 
 ## Program
 ⌘K | Sunucu listesi ve bağlanma
@@ -147,7 +150,7 @@ Enter ile zip, tar, tar.gz, tgz, tbz, txz veya gz dosyasının içine girilir. �
 Üstteki yıldız etkin klasörü favorilere ekler veya çıkarır. F1 listeyi açar, 1-9 ile seçilir.
 
 ## SSH bağlantıları
-⌥F9 veya SSH düğmesi kayıtlı SSH sunucularını listeler; 1-9 ile seçilir. Alttaki terminalde açılır ve F9'a basana kadar orada kalır. Tik işareti o bağlantının açık olduğunu gösterir.
+⌥F10 veya Terminal düğmesi kayıtlı SSH sunucularını listeler; 1-9 ile seçilir. Alttaki terminalde açılır ve F9'a basana kadar orada kalır. Tik işareti o bağlantının açık olduğunu gösterir.
 Sunucu listesinde (⌘K) SSH seçip girişi ayarlayın:
 Parola | Parola alanına yazın.
 .pem anahtar | Anahtar dosyası alanından seçin. Başkaları okuyabiliyorsa izni 600 yapılır, yoksa ssh kabul etmez. Anahtarın parolası parola alanına yazılır.

@@ -12,6 +12,7 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
     private let favorites = FavoritesStore()
     private let favoriteToggle = NSButton()
     private var favoriteChips: [NSButton] = []
+    private(set) var panelSplit: PanelSplitView?
     private var topBar: NSStackView!
     private var queueTimer: Timer?
     private var siteManager: SiteManagerController?
@@ -38,7 +39,8 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
     private let compareButton = NSButton()
     private let packButton = NSButton()
     private let helpButton = NSButton()
-    private let sshButton = NSButton()
+    private let ftpButton = NSButton()
+    private let terminalMenuButton = NSButton()
     private var searchWindows: [SearchWindowController] = []
     private var packFolders: [URL] = []
     private let toast = NSTextField(labelWithString: "")
@@ -74,8 +76,9 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let defaults = UserDefaults.standard
         let showHidden = defaults.object(forKey: "showHidden") as? Bool ?? true
-        left = PanelController(path: home, showAttributes: false)
-        right = PanelController(path: home, showAttributes: true)
+        let remembered = defaults.dictionary(forKey: Self.lastFoldersKey) as? [String: String] ?? [:]
+        left = PanelController(path: LastFolders.resolve(saved: remembered["left"], home: home), showAttributes: false)
+        right = PanelController(path: LastFolders.resolve(saved: remembered["right"], home: home), showAttributes: true)
         left.showHidden = showHidden
         right.showHidden = showHidden
         temporaryRoot = FileManager.default.temporaryDirectory.appendingPathComponent("MacdowsCommander-\(UUID().uuidString)")
@@ -143,16 +146,15 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
         topButton(compareButton, #selector(compareClicked(_:)))
         topButton(packButton, #selector(packClicked))
         topButton(helpButton, #selector(helpClicked))
-        topButton(sshButton, #selector(showSSHMenu(_:)))
-        let top = NSStackView(views: [favoriteToggle, spacer, newFileButton, mirrorButton, compareButton, sshButton, helpButton, searchButton, packButton, hiddenButton, attributesButton, newWindowButton])
+        topButton(ftpButton, #selector(showFTPMenu(_:)))
+        topButton(terminalMenuButton, #selector(showTerminalMenu(_:)))
+        let top = NSStackView(views: [favoriteToggle, spacer, newFileButton, mirrorButton, compareButton, ftpButton, terminalMenuButton, helpButton, searchButton, packButton, hiddenButton, attributesButton, newWindowButton])
         top.translatesAutoresizingMaskIntoConstraints = false
         top.spacing = 6
         topBar = top
 
-        let split = NSStackView(views: [left.view, right.view])
-        split.distribution = .fillEqually
-        split.spacing = 6
-        split.translatesAutoresizingMaskIntoConstraints = false
+        let split = PanelSplitView(left: left.view, right: right.view)
+        panelSplit = split
 
         queueSummary.font = AppFont.interface(12)
         queueSummary.textColor = .secondaryLabelColor
@@ -298,7 +300,7 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
     @objc private func languageChanged() { relabel() }
 
     @objc private func applyInterfaceFonts() {
-        for button in [hiddenButton, attributesButton, newWindowButton, favoriteToggle, searchButton, newFileButton, mirrorButton, compareButton, packButton, helpButton, sshButton, editorButton, clearButton, cancelButton] {
+        for button in [hiddenButton, attributesButton, newWindowButton, favoriteToggle, searchButton, newFileButton, mirrorButton, compareButton, packButton, helpButton, ftpButton, terminalMenuButton, editorButton, clearButton, cancelButton] {
             button.font = AppFont.interface(11)
         }
         functionButtons.forEach { $0.button.font = AppFont.interface(12) }
@@ -316,7 +318,8 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
         compareButton.title = L10n.t("top.compare")
         packButton.title = L10n.t("top.pack")
         helpButton.title = L10n.t("top.help")
-        sshButton.title = L10n.t("top.ssh")
+        ftpButton.title = L10n.t("top.ftp")
+        terminalMenuButton.title = L10n.t("top.terminal")
         clearButton.title = L10n.t("queue.clear")
         cancelButton.title = L10n.t("queue.cancel")
         for item in functionButtons {
@@ -377,7 +380,8 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
             case 122: HelpWindowController.show() // Option+F1
             case 99: compareFiles() // Option+F3
             case 96: startPack() // Option+F5
-            case 101: showSSHMenu(nil) // Option+F9
+            case 101: showFTPMenu(nil) // Option+F9
+            case 109: showTerminalMenu(nil) // Option+F10
             case 98: showSearch(nil) // Option+F7
             default: return false
             }
@@ -1819,7 +1823,68 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
     private var terminalIsPinned = false
 
     /// Saved SSH servers, the local shell, and a way to the server list.
-    func sshMenu() -> NSMenu {
+    /// Option+F9: the saved servers, to browse in the active panel. The terminal has its own list on Option+F10.
+    func ftpMenu() -> NSMenu {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        let sites = store.load().filter { !$0.host.isEmpty }
+        for (index, site) in sites.enumerated() {
+            var details = ["\(site.proto.badge)  " + (site.user.isEmpty ? site.host : "\(site.user)@\(site.host)")]
+            if let key = site.keyFile, !key.isEmpty { details.append("🔑 " + (key as NSString).lastPathComponent) }
+            if let hop = sites.first(where: { $0.id == site.jumpSiteID }) { details.append("→ " + hop.name) }
+            let item = NSMenuItem(title: "\(site.name)    \(details.joined(separator: "  "))", action: #selector(ftpMenuChosen(_:)), keyEquivalent: index < 9 ? String(index + 1) : "")
+            item.keyEquivalentModifierMask = []
+            item.target = self
+            item.representedObject = site.id
+            item.state = active.site?.id == site.id ? .on : .off
+            menu.addItem(item)
+        }
+        if sites.isEmpty {
+            let empty = NSMenuItem(title: L10n.t("ftp.empty"), action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            menu.addItem(empty)
+        }
+        menu.addItem(.separator())
+        let disk = NSMenuItem(title: L10n.t("ftp.local"), action: #selector(ftpLocalChosen), keyEquivalent: "")
+        disk.target = self
+        disk.state = active.site == nil && !active.isInArchive ? .on : .off
+        menu.addItem(disk)
+        let manage = NSMenuItem(title: L10n.t("ssh.manage"), action: #selector(showSiteManager(_:)), keyEquivalent: "")
+        manage.target = self
+        menu.addItem(manage)
+        return menu
+    }
+
+    @objc func showFTPMenu(_ sender: Any?) {
+        guard window?.attachedSheet == nil else { return }
+        let view = active.view
+        ftpMenu().popUp(positioning: nil, at: NSPoint(x: 24, y: view.bounds.height - 40), in: view)
+    }
+
+    @objc private func ftpMenuChosen(_ item: NSMenuItem) {
+        guard let id = item.representedObject as? UUID, let site = store.load().first(where: { $0.id == id }) else { return }
+        let panel = active
+        showToast(L10n.t("sites.connecting", site.name))
+        let source = SourceFactory.make(site: site, password: store.password(for: id))
+        panel.connect(site: site, source: source, path: site.path) { [weak self, weak panel] error in
+            guard let self, let panel else { return }
+            if let error {
+                self.showError(error.localizedDescription, title: L10n.t("sites.connectFailed", site.name))
+            } else {
+                self.toast.isHidden = true
+                self.activate(panel)
+            }
+        }
+    }
+
+    @objc private func ftpLocalChosen() {
+        let panel = active
+        panel.connect(site: nil, source: LocalSource(), path: FileManager.default.homeDirectoryForCurrentUser.path)
+        activate(panel)
+    }
+
+    /// Option+F10: the shells to open in the bottom terminal: saved SSH servers and this Mac.
+    func terminalMenu() -> NSMenu {
         let menu = NSMenu()
         menu.autoenablesItems = false
         let sites = store.load().filter { $0.proto == .ssh && !$0.host.isEmpty }
@@ -1851,10 +1916,10 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
         return menu
     }
 
-    @objc func showSSHMenu(_ sender: Any?) {
+    @objc func showTerminalMenu(_ sender: Any?) {
         guard window?.attachedSheet == nil else { return }
         let view = active.view
-        sshMenu().popUp(positioning: nil, at: NSPoint(x: 24, y: view.bounds.height - 40), in: view)
+        terminalMenu().popUp(positioning: nil, at: NSPoint(x: 24, y: view.bounds.height - 40), in: view)
     }
 
     @objc private func sshMenuChosen(_ item: NSMenuItem) {
@@ -1895,7 +1960,18 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
 
     /// Follows the panel only where it is safe: an idle local shell. A remote one gets its cd on F9,
     /// because nothing here can tell whether it is at a prompt or inside a program.
+    private static let lastFoldersKey = "lastFolders.v1"
+
+    /// Remembers each panel's folder for the next start. Folders on a server or inside an archive are not kept.
+    private func rememberFolder(of panel: PanelController) {
+        guard !panel.source.isRemote, !panel.isInArchive else { return }
+        var saved = UserDefaults.standard.dictionary(forKey: Self.lastFoldersKey) as? [String: String] ?? [:]
+        saved[panel === left ? "left" : "right"] = panel.path
+        UserDefaults.standard.set(saved, forKey: Self.lastFoldersKey)
+    }
+
     private func panelPathChanged(_ panel: PanelController) {
+        rememberFolder(of: panel)
         updateFavoriteToggle()
         guard !terminalPane.isHidden, !terminalIsPinned, panel === active, let target = terminalTarget(for: panel) else { return }
         guard let session = terminalPane.runningSession(for: target) else {

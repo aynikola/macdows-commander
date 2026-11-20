@@ -18,6 +18,7 @@ macOS için Windows Commander ruhunda, iki panelli yerel dosya yöneticisi. Swif
 - Ada yavaşça ikinci kez tıklayınca yerinde yeniden adlandırılır
 - Başka bir program klasörü değiştirince paneller kendiliğinden yenilenir
 - Finder'ın renkli etiketleri adın yanında nokta olarak görünür
+- Paneller arasındaki çubuğu sürükleyerek boyutlandırın; uygulama kapandığınız klasörlerde açılır
 - `F2` aynı klasörü diğer panelde açar, alttaki yol kutusuna yol yapıştırıp Enter ile gidilir
 - `⌘1`, `⌘2`, `⌘3` ada, boyuta ve tarihe göre sıralar; `⌘4` en yeniyi üste alır, klasör ve dosya karışık
 - `F3` metin, HTML, Markdown, resim, PDF, video ve ses önizler

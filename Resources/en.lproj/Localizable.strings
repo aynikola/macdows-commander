@@ -270,8 +270,12 @@
 "edit.goToTitle" = "Go to line (1 to %@)";
 "edit.goToPlaceholder" = "Now on line %@. Line, or line:column";
 
-"top.ssh" = "SSH ⌥F9";
-"menu.sshList" = "SSH Connections";
+"top.ftp" = "FTP ⌥F9";
+"top.terminal" = "Terminal ⌥F10";
+"menu.ftpList" = "FTP Connections";
+"ftp.empty" = "No saved servers yet";
+"ftp.local" = "Local disk";
+"menu.sshList" = "Terminal Connections";
 "ssh.empty" = "No saved SSH servers yet";
 "ssh.local" = "Local terminal";
 "ssh.manage" = "Add or edit servers… ⌘K";

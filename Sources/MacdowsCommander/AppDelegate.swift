@@ -129,7 +129,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         viewMenu.addItem(item(t("menu.refresh", []), #selector(MainWindowController.refreshPanels(_:)), "r"))
         viewMenu.addItem(item(t("menu.terminalPane", []), #selector(MainWindowController.toggleTerminalPane(_:)), "j"))
 
-        viewMenu.addItem(item(t("menu.sshList", []), #selector(MainWindowController.showSSHMenu(_:)), String(UnicodeScalar(NSF9FunctionKey)!), .option))
+        viewMenu.addItem(item(t("menu.ftpList", []), #selector(MainWindowController.showFTPMenu(_:)), String(UnicodeScalar(NSF9FunctionKey)!), .option))
+        viewMenu.addItem(item(t("menu.sshList", []), #selector(MainWindowController.showTerminalMenu(_:)), String(UnicodeScalar(NSF10FunctionKey)!), .option))
         viewMenu.addItem(.separator())
         viewMenu.addItem(item(t("menu.textBigger", []), #selector(biggerText(_:)), "+", target: self))
         // Layouts where + needs Shift send = with Command.

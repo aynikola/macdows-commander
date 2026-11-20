@@ -519,6 +519,59 @@ final class MainWindowTests: XCTestCase {
         }
     }
 
+    func testSplitBarMovesTheDividerAndIsRemembered() throws {
+        let suite = "split-test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let left = NSView(), right = NSView()
+        let host = NSView(frame: NSRect(x: 0, y: 0, width: 1008, height: 300))
+        let split = PanelSplitView(left: left, right: right, defaults: defaults)
+        host.addSubview(split)
+        NSLayoutConstraint.activate([
+            split.leadingAnchor.constraint(equalTo: host.leadingAnchor), split.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+            split.topAnchor.constraint(equalTo: host.topAnchor), split.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+        ])
+        func widths() -> (CGFloat, CGFloat) { host.layoutSubtreeIfNeeded(); return (left.frame.width, right.frame.width) }
+        XCTAssertEqual(widths().0, 500, accuracy: 1)
+        XCTAssertEqual(widths().1, 500, accuracy: 1)
+        split.drag(toX: 304)  // pointer at 304: the left panel ends at 300
+        XCTAssertEqual(widths().0, 300, accuracy: 1)
+        XCTAssertEqual(widths().1, 700, accuracy: 1)
+        split.drag(toX: -50)
+        XCTAssertEqual(split.ratio, PanelSplitView.limits.lowerBound, "cannot be dragged shut")
+        split.drag(toX: 5000)
+        XCTAssertEqual(split.ratio, PanelSplitView.limits.upperBound)
+        split.drag(toX: 504)
+        XCTAssertEqual(PanelSplitView(left: NSView(), right: NSView(), defaults: defaults).ratio, split.ratio, accuracy: 0.001, "the next start opens the same")
+        split.reset()
+        XCTAssertEqual(widths().0, 500, accuracy: 1)
+    }
+
+    func testPanelsOpenWhereTheyWereAndFallBackWhenAFolderIsGone() throws {
+        let home = "/Users/nobody"
+        XCTAssertEqual(LastFolders.resolve(saved: root.path, home: home), root.path)
+        XCTAssertEqual(LastFolders.resolve(saved: root.appendingPathComponent("one/silinmis/derin").path, home: home), root.appendingPathComponent("one").path)
+        XCTAssertEqual(LastFolders.resolve(saved: root.appendingPathComponent("file.txt").path, home: home), root.path, "a file is not a folder")
+        XCTAssertEqual(LastFolders.resolve(saved: nil, home: home), home)
+        XCTAssertEqual(LastFolders.resolve(saved: "goreli/yol", home: home), home)
+    }
+
+    func testClosingAndReopeningRestoresEachPanelsFolder() throws {
+        let key = "lastFolders.v1"
+        let before = UserDefaults.standard.object(forKey: key)
+        defer { if let before { UserDefaults.standard.set(before, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) } }
+        var done = false
+        controller.left.load(path: root.appendingPathComponent("one").path, select: nil) { _ in done = true }
+        spin("left loaded") { done }
+        done = false
+        controller.right.load(path: root.appendingPathComponent("two").path, select: nil) { _ in done = true }
+        spin("right loaded") { done }
+        let reopened = MainWindowController()
+        defer { reopened.window?.close() }
+        XCTAssertEqual(reopened.left.path, root.appendingPathComponent("one").path)
+        XCTAssertEqual(reopened.right.path, root.appendingPathComponent("two").path)
+    }
+
     func testManualLinksToGitHub() {
         let rendered = HelpWindowController.render("See https://github.com/aynikola/macdows-commander here")
         let start = (rendered.string as NSString).range(of: "https://").location
@@ -548,6 +601,20 @@ final class MainWindowTests: XCTestCase {
         XCTAssertLessThan(width, column.width)
     }
 
+    func testFTPMenuListsEveryServerAndTerminalMenuOnlySSH() {
+        let store = SiteStore()
+        let saved = store.load()
+        defer { store.save(saved) }
+        let ssh = Site(name: "Gecit", proto: .ssh, host: "gate", user: "a")
+        store.save([ssh, Site(name: "FtpOnly", proto: .ftp, host: "f", user: "u")])
+        let ftp = controller.ftpMenu().items.map(\.title)
+        XCTAssertTrue(ftp.contains { $0.contains("FtpOnly") && $0.contains("u@f") }, "\(ftp)")
+        XCTAssertTrue(ftp.contains { $0.contains("Gecit") }, "\(ftp)")
+        XCTAssertEqual(controller.ftpMenu().items[1].keyEquivalent, "2")
+        XCTAssertFalse(controller.terminalMenu().items.contains { $0.title.contains("FtpOnly") }, "FTP has no shell")
+        XCTAssertFalse(ftp.contains { $0.contains("Terminal") }, "no terminal entries in the FTP list")
+    }
+
     func testSSHMenuListsSavedServers() {
         let store = SiteStore()
         let saved = store.load()
@@ -555,9 +622,9 @@ final class MainWindowTests: XCTestCase {
         let hop = Site(name: "Gecit", proto: .ssh, host: "gate", user: "a")
         let target = Site(name: "Hacettepe", proto: .ssh, host: "h.example", user: "b", keyFile: "/k/lab.pem", jumpSiteID: hop.id)
         store.save([hop, target, Site(name: "FtpOnly", proto: .ftp, host: "f")])
-        let titles = controller.sshMenu().items.map(\.title)
+        let titles = controller.terminalMenu().items.map(\.title)
         XCTAssertTrue(titles.contains { $0.contains("Hacettepe") && $0.contains("b@h.example") && $0.contains("lab.pem") && $0.contains("Gecit") }, "\(titles)")
         XCTAssertFalse(titles.contains { $0.contains("FtpOnly") }, "FTP has no shell")
-        XCTAssertEqual(controller.sshMenu().items[1].keyEquivalent, "2")
+        XCTAssertEqual(controller.terminalMenu().items[1].keyEquivalent, "2")
     }
 }

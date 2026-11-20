@@ -270,8 +270,12 @@
 "edit.goToTitle" = "Satıra git (1 ile %@ arası)";
 "edit.goToPlaceholder" = "Şu an %@. satırdasınız. Satır veya satır:sütun";
 
-"top.ssh" = "SSH ⌥F9";
-"menu.sshList" = "SSH Bağlantıları";
+"top.ftp" = "FTP ⌥F9";
+"top.terminal" = "Terminal ⌥F10";
+"menu.ftpList" = "FTP Bağlantıları";
+"ftp.empty" = "Henüz kayıtlı sunucu yok";
+"ftp.local" = "Yerel disk";
+"menu.sshList" = "Terminal Bağlantıları";
 "ssh.empty" = "Henüz kayıtlı SSH sunucusu yok";
 "ssh.local" = "Yerel terminal";
 "ssh.manage" = "Sunucu ekle veya düzenle… ⌘K";
