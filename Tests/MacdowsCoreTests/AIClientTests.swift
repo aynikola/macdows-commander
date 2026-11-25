@@ -124,6 +124,33 @@ final class AIClientTests: XCTestCase {
         XCTAssertTrue(AIClient.errorMessage(status: 404, body: Data(#"[{"error":{"message":"This model is no longer available."}}]"#.utf8)).contains("Load list"), "a retired model points to the list")
     }
 
+    func testModelChoicesPutTheCurrentOneFirstWithoutRepeats() {
+        let config = AIConfig(providerID: "gemini", baseURL: "x", model: "gemini-2.0-flash", apiKey: "k")
+        let choices = AIProviders.choices(for: config, fetched: ["gemini-9", "gemini-2.0-flash"])
+        XCTAssertEqual(choices.first, "gemini-2.0-flash")
+        XCTAssertEqual(choices[1], "gemini-9", "the fetched list comes before the suggestions")
+        XCTAssertEqual(choices.count, Set(choices).count, "no name twice")
+        XCTAssertTrue(choices.contains("gemini-3.5-flash-lite"))
+        for provider in AIProviders.all where provider.id != "custom" { XCTAssertFalse(provider.suggestedModels.isEmpty, provider.id) }
+        XCTAssertTrue(AIProviders.provider(id: "gemini").suggestedModels.contains(AIProviders.provider(id: "gemini").defaultModel), "the default is one of the suggestions")
+    }
+
+    func testFetchedListsDropModelsThatCannotChatAndTheModelsPrefix() {
+        XCTAssertEqual(AIClient.chatModels(["models/gemini-3.5-flash", "models/text-embedding-004", "whisper-large-v3", "llama-3.3-70b", "models/gemini-3.5-flash", "playai-tts"]),
+                       ["gemini-3.5-flash", "llama-3.3-70b"])
+    }
+
+    func testFetchedModelsAreRemembered() {
+        let suite = "ai-models-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = AISettingsStore(defaults: defaults)
+        XCTAssertEqual(store.fetchedModels(for: "groq"), [])
+        store.setFetchedModels(["a", "b"], for: "groq")
+        XCTAssertEqual(store.fetchedModels(for: "groq"), ["a", "b"])
+        XCTAssertEqual(store.fetchedModels(for: "gemini"), [], "each service has its own")
+    }
+
     func testModelsAreListedSorted() async throws {
         StubProtocol.status = 200
         StubProtocol.body = Data(#"{"data":[{"id":"zeta"},{"id":"alfa"}]}"#.utf8)

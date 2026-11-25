@@ -170,7 +170,7 @@ GitHub Models | GitHub hesabıyla ücretsiz: Models izinli bir token anahtar ola
 Grok (xAI) | Kullanıma göre ücretli, xAI konsolundan anahtar
 Claude | Kullanıma göre ücretli, API anahtarıyla
 Diğer | OpenAI sohbet arayüzü olan her sunucu, örneğin LM Studio
-Listele | Servise hangi modelleri sunduğunu sorar; model kutusuna elle de yazılabilir
+Modeller | Sohbetin altındaki kutu modeli hemen değiştirir. Ayarlar servisin kendi listesini kendiliğinden çeker, böylece kaldırılan adlar düşer; model kutusuna elle de yazılabilir
 Siz Enter'a basmadan hiçbir şey gönderilmez. Sohbetin altındaki kutu, imleçteki metin dosyasını sorunuza ekler. Başlık çubuğu metnin hangi servise ve modele gittiğini gösterir. Anahtarlar Anahtar Zinciri'nde saklanır.
 Write'ta (F10) AI menüsü yazım hatalarını düzeltir, metni iyileştirir, kısaltır, uzatır, çevirir, özetler, yazıya devam eder ya da istediğinizi yapar. Seçili metinde, seçim yoksa imlecin olduğu paragrafta çalışır; ⌘Z geri alır.
 

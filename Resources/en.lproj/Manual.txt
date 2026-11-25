@@ -170,7 +170,7 @@ GitHub Models | Free with a GitHub account: a token with the Models permission a
 Grok (xAI) | Paid by use, with a key from the xAI console
 Claude | Paid by use, with an API key
 Other | Any server with the OpenAI chat API, such as LM Studio
-Load list | Asks the service which models it has; the model box can also be typed in
+Models | The box under the chat switches the model at once. Settings fetches the service's own list by itself, so retired names drop out; the model box can also be typed in
 Nothing is sent until you press Enter. The box under the chat adds the text file under the cursor to your question. The title bar shows which service and model get the text. Keys are kept in the Keychain.
 In Write (F10) the AI menu fixes spelling, improves, shortens, lengthens, translates, summarizes, continues the text or does what you ask. It works on the selected text, or on the paragraph the cursor is in; ⌘Z undoes it.
 

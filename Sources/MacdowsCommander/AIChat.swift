@@ -36,7 +36,7 @@ final class AISettingsForm: NSObject {
         model.usesDataSource = false
         loadButton.title = L10n.t("ai.loadModels")
         loadButton.target = self
-        loadButton.action = #selector(loadModels)
+        loadButton.action = #selector(loadModelsClicked)
         testButton.title = L10n.t("ai.test")
         testButton.target = self
         testButton.action = #selector(runTest)
@@ -92,11 +92,14 @@ final class AISettingsForm: NSObject {
         keyLink.isHidden = selected.keyPage == nil
         address.stringValue = config.baseURL
         address.isEnabled = selected.id == "custom"
-        model.stringValue = config.model
         model.removeAllItems()
+        model.addItems(withObjectValues: AIProviders.choices(for: config, fetched: store.fetchedModels(for: selected.id)))
+        model.stringValue = config.model
         key.stringValue = config.apiKey
         key.placeholderString = selected.needsKey ? L10n.t("ai.keyNeeded") : L10n.t("ai.keyOptional")
         status.stringValue = ""
+        // The service's own list is the one that is right, so it is asked for without being told to.
+        if !selected.needsKey || !config.apiKey.isEmpty { loadModels(silent: true) }
     }
 
     var config: AIConfig {
@@ -117,20 +120,24 @@ final class AISettingsForm: NSObject {
         status.textColor = isError ? .systemRed : .secondaryLabelColor
     }
 
-    @objc private func loadModels() {
+    @objc private func loadModelsClicked() { loadModels(silent: false) }
+
+    private func loadModels(silent: Bool) {
         let current = config
-        show(L10n.t("ai.testing"))
+        if !silent { show(L10n.t("ai.testing")) }
         work?.cancel()
         work = Task { @MainActor [weak self] in
             do {
                 let names = try await AIClient(config: current).models()
-                guard let self else { return }
+                guard let self, self.chosen.id == current.providerID else { return }
+                self.store.setFetchedModels(names, for: current.providerID)
+                let typed = self.model.stringValue
                 self.model.removeAllItems()
-                self.model.addItems(withObjectValues: names)
-                if self.model.stringValue.isEmpty, let first = names.first { self.model.stringValue = first }
+                self.model.addItems(withObjectValues: AIProviders.choices(for: current, fetched: names))
+                self.model.stringValue = typed.isEmpty ? (names.first ?? "") : typed
                 self.show(L10n.t("ai.modelsLoaded", String(names.count)))
             } catch {
-                if !(error is CancellationError) { self?.show(error.localizedDescription, isError: true) }
+                if !silent, !(error is CancellationError) { self?.show(error.localizedDescription, isError: true) }
             }
         }
     }
@@ -198,7 +205,9 @@ final class AIChatView: NSView, NSTextFieldDelegate {
     private let settingsButton = NSButton()
     private let newChatButton = NSButton()
     private let contextCheck = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    private let modelPopup = NSPopUpButton()
     private let store = AISettingsStore()
+    nonisolated(unsafe) private static var listedThisRun = Set<String>()
     private var history: [AIMessage] = []
     private var answering: Task<Void, Never>?
     private var transcript: NSTextView? { scroll.documentView as? NSTextView }
@@ -233,12 +242,17 @@ final class AIChatView: NSView, NSTextFieldDelegate {
         newChatButton.action = #selector(newChat)
         contextCheck.controlSize = .small
         contextCheck.font = AppFont.interface(11)
+        modelPopup.controlSize = .small
+        modelPopup.font = AppFont.interface(11)
+        modelPopup.target = self
+        modelPopup.action = #selector(modelPicked)
+        modelPopup.toolTip = L10n.t("ai.model")
         transcript?.isEditable = false
         transcript?.drawsBackground = false
         transcript?.textContainerInset = NSSize(width: 10, height: 10)
         scroll.drawsBackground = false
 
-        let options = NSStackView(views: [contextCheck, NSView(), newChatButton])
+        let options = NSStackView(views: [contextCheck, NSView(), modelPopup, newChatButton])
         options.spacing = 8
         let entry = NSStackView(views: [input, sendButton, settingsButton])
         entry.spacing = 6
@@ -294,6 +308,7 @@ final class AIChatView: NSView, NSTextFieldDelegate {
 
     /// Called as the cursor moves: offers the file it is on.
     func refreshContext() {
+        refreshModels()
         currentContext = contextProvider?()
         if let currentContext {
             contextCheck.title = L10n.t("ai.context", currentContext.name)
@@ -317,6 +332,36 @@ final class AIChatView: NSView, NSTextFieldDelegate {
     }
 
     func configChanged() {
+        refreshModels()
+        onConfigChange?(summary)
+    }
+
+    // MARK: Model
+
+    /// The models to switch between: the one in use, the service's own list, and the suggestions.
+    private func refreshModels() {
+        let config = store.load()
+        let choices = AIProviders.choices(for: config, fetched: store.fetchedModels(for: config.providerID))
+        if modelPopup.itemTitles != choices {
+            modelPopup.removeAllItems()
+            modelPopup.addItems(withTitles: choices)
+        }
+        modelPopup.selectItem(withTitle: config.model)
+        modelPopup.isEnabled = !choices.isEmpty
+        // Once per service per run the real list is fetched, so names that were retired drop out of the menu.
+        guard config.isReady, Self.listedThisRun.insert(config.providerID).inserted else { return }
+        Task { @MainActor [weak self] in
+            guard let names = try? await AIClient(config: config).models(), !names.isEmpty else { return }
+            self?.store.setFetchedModels(names, for: config.providerID)
+            self?.refreshModels()
+        }
+    }
+
+    @objc private func modelPicked() {
+        guard let title = modelPopup.titleOfSelectedItem else { return }
+        var config = store.load()
+        config.model = title
+        store.save(config)
         onConfigChange?(summary)
     }
 

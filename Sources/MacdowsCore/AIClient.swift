@@ -12,6 +12,8 @@ public struct AIProvider: Equatable, Identifiable {
     public let kind: AIKind
     public let baseURL: String
     public let defaultModel: String
+    /// Models worth offering before the service's own list has been fetched. Names change, so the live list wins.
+    public let suggestedModels: [String]
     public let needsKey: Bool
     /// One line for the settings: what it costs and where to get a key.
     public let note: String
@@ -20,25 +22,31 @@ public struct AIProvider: Equatable, Identifiable {
 
 public enum AIProviders {
     public static let all: [AIProvider] = [
-        AIProvider(id: "gemini", name: "Google Gemini (free tier)", kind: .openAI, baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", defaultModel: "gemini-3.5-flash-lite", needsKey: true,
+        AIProvider(id: "gemini", name: "Google Gemini (free tier)", kind: .openAI, baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", defaultModel: "gemini-3.5-flash-lite", suggestedModels: ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"], needsKey: true,
                    note: "Free tier, no card needed. Get a key in Google AI Studio and paste it here.", keyPage: "https://aistudio.google.com/apikey"),
-        AIProvider(id: "groq", name: "Groq (free tier, very fast)", kind: .openAI, baseURL: "https://api.groq.com/openai/v1", defaultModel: "llama-3.3-70b-versatile", needsKey: true,
+        AIProvider(id: "groq", name: "Groq (free tier, very fast)", kind: .openAI, baseURL: "https://api.groq.com/openai/v1", defaultModel: "llama-3.3-70b-versatile", suggestedModels: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3-32b"], needsKey: true,
                    note: "Free tier. Get a free key from the Groq console.", keyPage: "https://console.groq.com/keys"),
-        AIProvider(id: "openrouter", name: "OpenRouter (free models)", kind: .openAI, baseURL: "https://openrouter.ai/api/v1", defaultModel: "meta-llama/llama-3.3-70b-instruct:free", needsKey: true,
+        AIProvider(id: "openrouter", name: "OpenRouter (free models)", kind: .openAI, baseURL: "https://openrouter.ai/api/v1", defaultModel: "meta-llama/llama-3.3-70b-instruct:free", suggestedModels: ["meta-llama/llama-3.3-70b-instruct:free", "google/gemma-3-27b-it:free", "deepseek/deepseek-r1:free", "qwen/qwen3-235b-a22b:free", "mistralai/mistral-small-3.2-24b-instruct:free"], needsKey: true,
                    note: "Models whose name ends in :free cost nothing. Get a free key from OpenRouter.", keyPage: "https://openrouter.ai/keys"),
-        AIProvider(id: "cerebras", name: "Cerebras (free tier, very fast)", kind: .openAI, baseURL: "https://api.cerebras.ai/v1", defaultModel: "llama-3.3-70b", needsKey: true,
+        AIProvider(id: "cerebras", name: "Cerebras (free tier, very fast)", kind: .openAI, baseURL: "https://api.cerebras.ai/v1", defaultModel: "llama-3.3-70b", suggestedModels: ["llama-3.3-70b", "llama3.1-8b", "qwen-3-32b", "gpt-oss-120b"], needsKey: true,
                    note: "Free tier. Get a free key from Cerebras.", keyPage: "https://cloud.cerebras.ai"),
-        AIProvider(id: "mistral", name: "Mistral (free plan)", kind: .openAI, baseURL: "https://api.mistral.ai/v1", defaultModel: "mistral-small-latest", needsKey: true,
+        AIProvider(id: "mistral", name: "Mistral (free plan)", kind: .openAI, baseURL: "https://api.mistral.ai/v1", defaultModel: "mistral-small-latest", suggestedModels: ["mistral-small-latest", "mistral-medium-latest", "mistral-large-latest", "open-mistral-nemo", "codestral-latest"], needsKey: true,
                    note: "The free Experiment plan is enough. Get a key from the Mistral console.", keyPage: "https://console.mistral.ai/api-keys"),
-        AIProvider(id: "github", name: "GitHub Models (free with GitHub)", kind: .openAI, baseURL: "https://models.github.ai/inference", defaultModel: "openai/gpt-4o-mini", needsKey: true,
+        AIProvider(id: "github", name: "GitHub Models (free with GitHub)", kind: .openAI, baseURL: "https://models.github.ai/inference", defaultModel: "openai/gpt-4o-mini", suggestedModels: ["openai/gpt-4o-mini", "openai/gpt-4o", "openai/gpt-4.1", "meta/Llama-3.3-70B-Instruct", "deepseek/DeepSeek-R1"], needsKey: true,
                    note: "Free with a GitHub account. Create a token with the Models permission and paste it as the key.", keyPage: "https://github.com/settings/personal-access-tokens"),
-        AIProvider(id: "xai", name: "Grok (xAI)", kind: .openAI, baseURL: "https://api.x.ai/v1", defaultModel: "grok-3-mini", needsKey: true,
+        AIProvider(id: "xai", name: "Grok (xAI)", kind: .openAI, baseURL: "https://api.x.ai/v1", defaultModel: "grok-3-mini", suggestedModels: ["grok-3-mini", "grok-3", "grok-4"], needsKey: true,
                    note: "Paid by use, though xAI may give some starting credit. Get a key from the xAI console.", keyPage: "https://console.x.ai"),
-        AIProvider(id: "anthropic", name: "Claude (Anthropic, paid)", kind: .anthropic, baseURL: "https://api.anthropic.com", defaultModel: "claude-sonnet-5-5", needsKey: true,
+        AIProvider(id: "anthropic", name: "Claude (Anthropic, paid)", kind: .anthropic, baseURL: "https://api.anthropic.com", defaultModel: "claude-sonnet-5-5", suggestedModels: ["claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-5-5", "claude-fable-5-1"], needsKey: true,
                    note: "Paid, by use. An API key is needed.", keyPage: "https://console.anthropic.com/settings/keys"),
-        AIProvider(id: "custom", name: "Other (OpenAI compatible)", kind: .openAI, baseURL: "http://localhost:1234/v1", defaultModel: "", needsKey: false,
+        AIProvider(id: "custom", name: "Other (OpenAI compatible)", kind: .openAI, baseURL: "http://localhost:1234/v1", defaultModel: "", suggestedModels: [], needsKey: false,
                    note: "Any server with the OpenAI chat API, such as LM Studio or a company server. A key is optional.", keyPage: nil),
     ]
+
+    /// What the model box offers: the one in use, then the service's own list if it was fetched, then the suggestions.
+    public static func choices(for config: AIConfig, fetched: [String]) -> [String] {
+        var seen = Set<String>()
+        return ([config.model] + fetched + config.provider.suggestedModels).filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
 
     public static func provider(id: String) -> AIProvider {
         all.first { $0.id == id } ?? all[0]
@@ -99,6 +107,15 @@ public final class AISettingsStore {
         defaults.set(config.baseURL, forKey: "ai.baseURL.\(config.providerID)")
         defaults.set(config.model, forKey: "ai.model.\(config.providerID)")
         setKey(config.apiKey, for: config.providerID)
+    }
+
+    /// The models a service listed the last time they were fetched.
+    public func fetchedModels(for providerID: String) -> [String] {
+        defaults.stringArray(forKey: "ai.models.\(providerID)") ?? []
+    }
+
+    public func setFetchedModels(_ models: [String], for providerID: String) {
+        defaults.set(models, forKey: "ai.models.\(providerID)")
     }
 
     /// The config a service would start with, as if it was just picked.
@@ -290,6 +307,13 @@ public final class AIClient {
         return text
     }
 
+    /// Only models that can chat, named the way a request wants them: Gemini lists "models/gemini-…" but takes "gemini-…".
+    static func chatModels(_ ids: [String]) -> [String] {
+        let skip = ["embed", "tts", "whisper", "imagen", "veo", "guard", "moderation", "aqa", "transcribe", "dall-e", "image", "audio"]
+        let names = ids.map { $0.hasPrefix("models/") ? String($0.dropFirst(7)) : $0 }
+        return Array(Set(names.filter { name in !skip.contains { name.lowercased().contains($0) } })).sorted()
+    }
+
     /// The models the service offers, for the settings list.
     public func models() async throws -> [String] {
         do {
@@ -299,7 +323,7 @@ public final class AIClient {
             }
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
             let list = (json?["data"] as? [[String: Any]])?.compactMap { $0["id"] as? String } ?? []
-            return list.sorted()
+            return Self.chatModels(list)
         } catch {
             throw friendly(error)
         }
