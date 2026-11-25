@@ -24,7 +24,9 @@ A native two-panel file manager for macOS, in the spirit of Windows Commander. W
 - `F3` previews text, HTML, Markdown, images, PDF, video and sound
 - Drag files in from Finder, or out to it
 - Search by name and content, browse zip and tar archives, keep favorite folders
-- `F11` opens the Mac's share menu, and `⌥F3` compares two files
+- `F11` opens the Mac's share menu, and `⌥F2` compares two files
+- `Ctrl+Q` shows size and info in the other panel and follows the cursor; `⌥F3` previews the file under the cursor there as you arrow through the list
+- `F12` opens an AI chat in the other panel; `Shift+F12` shows the folder in Finder
 
 ### Servers
 
@@ -55,6 +57,10 @@ Pictures open at their real size. Crop, change the image or canvas size, rotate,
 | ![Adding text with a shadow](docs/images/image-text.jpg) | ![Cropping a picture](docs/images/image-crop.jpg) |
 
 ![Markdown shown as a page](docs/images/markdown-preview.jpg)
+
+### AI help (F12, and in Write)
+
+Chat with an AI in the other panel, or let it help while you write: fix spelling, improve, shorten, translate, continue. Free choices: Ollama (runs on your Mac, no account) and the free tiers of OpenRouter, Groq and Google Gemini. Claude and any OpenAI-compatible server work too. Nothing is sent until you ask, and keys stay in the Keychain.
 
 ### Compare files
 

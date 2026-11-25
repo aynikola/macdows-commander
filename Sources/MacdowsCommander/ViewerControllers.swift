@@ -12,7 +12,7 @@ struct ViewerItem {
     let fetch: (@escaping (URL?) -> Void) -> Void
 }
 
-private enum ImageDecoder {
+enum ImageDecoder {
     /// Decoding at screen size instead of full size is what makes flipping through photos instant.
     static func decode(_ url: URL, maxPixels: Int, pdfPage: Int = 0) -> (image: NSImage, pixelSize: NSSize)? {
         if url.pathExtension.lowercased() == "pdf" {

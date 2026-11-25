@@ -11,6 +11,10 @@ public final class FTPClient: FileSource {
     private var effectiveMode: ConnectionMode
     private var detectedEncoding: String.Encoding
 
+    /// Whether the server understands "LIST -a". Learned from the first listing, so later ones need one request, not two.
+    private enum HiddenListing { case unknown, works, broken }
+    private var hiddenListing = HiddenListing.unknown
+
     private static let globalInit: Void = { curl_global_init(Int(CURL_GLOBAL_ALL)) }()
 
     public init(site: Site, password: String) {
@@ -106,6 +110,8 @@ public final class FTPClient: FileSource {
         mc_set_long(handle, CURLOPT_TCP_KEEPALIVE, 1)
         // Routers often make servers announce a private address in passive mode: use the address we already reached.
         mc_set_long(handle, CURLOPT_FTP_SKIP_PASV_IP, 1)
+        // One CWD straight to the folder. The default sends one per path segment, and each is a round trip to the server.
+        mc_set_long(handle, CURLOPT_FTP_FILEMETHOD, Int(CURLFTPMETHOD_SINGLECWD.rawValue))
         if mode == .active { mc_set_string(handle, CURLOPT_FTPPORT, "-") }
         if site.proto != .ftp {
             mc_set_long(handle, CURLOPT_USE_SSL, Int(CURLUSESSL_ALL.rawValue))
@@ -192,11 +198,29 @@ public final class FTPClient: FileSource {
 
     public func list(_ path: String) throws -> [FileEntry] {
         let directoryURL = url(for: path.hasSuffix("/") ? path : path + "/")
-        // Many servers hide dot files unless they get -a. Servers that dislike the flag fall back to plain LIST.
-        if let withHidden = try? fetchListing(url: directoryURL, command: "LIST -a"), !withHidden.isEmpty {
-            return withHidden
+        // Many servers hide dot files unless they get -a. Servers that dislike the flag get a plain LIST.
+        lock.lock(); let state = hiddenListing; lock.unlock()
+        switch state {
+        case .works:
+            return try fetchListing(url: directoryURL, command: "LIST -a")
+        case .broken:
+            return try fetchListing(url: directoryURL, command: nil)
+        case .unknown:
+            if let withHidden = try? fetchListing(url: directoryURL, command: "LIST -a") {
+                if !withHidden.isEmpty {
+                    lock.lock(); hiddenListing = .works; lock.unlock()
+                    return withHidden
+                }
+                // Empty can mean an empty folder or a server that ignores the flag: a plain LIST tells which.
+                let plain = try fetchListing(url: directoryURL, command: nil)
+                if !plain.isEmpty {
+                    lock.lock(); hiddenListing = .broken; lock.unlock()
+                }
+                return plain
+            }
+            lock.lock(); hiddenListing = .broken; lock.unlock()
+            return try fetchListing(url: directoryURL, command: nil)
         }
-        return try fetchListing(url: directoryURL, command: nil)
     }
 
     private func fetchListing(url: String, command: String?) throws -> [FileEntry] {

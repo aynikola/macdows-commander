@@ -184,6 +184,8 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
     var onError: ((String) -> Void)?
     var onPathChange: (() -> Void)?
     var onCursorChange: (() -> Void)?
+    /// Marks were added or removed, so anything built from the selection needs a fresh look.
+    var onMarksChange: (() -> Void)?
     /// A name typed in place after the slow second click.
     var onInlineRename: ((FileEntry, String) -> Void)?
     private var renaming: FileEntry?
@@ -642,6 +644,7 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         }
         if advance { moveCursor(to: row + 1) }
         updateStatus()
+        onMarksChange?()
     }
 
     /// Pressing a letter goes to the next name starting with it, and the same letter again to the one after.
@@ -709,6 +712,7 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         table.reloadData()
         moveCursor(to: row)
         updateStatus()
+        onMarksChange?()
     }
 
     /// Ctrl+A or ⌘A: marks everything. Pressed again it clears the marks.
@@ -717,12 +721,14 @@ final class PanelController: NSObject, NSTableViewDataSource, NSTableViewDelegat
         marked = marked == names ? [] : names
         table.reloadData()
         updateStatus()
+        onMarksChange?()
     }
 
     func clearMarks() {
         marked.removeAll()
         table.reloadData()
         updateStatus()
+        onMarksChange?()
     }
 
     func setComputedSize(_ size: Int64, for name: String) {

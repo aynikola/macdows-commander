@@ -21,7 +21,7 @@ Drag the bar between the panels | Gives one panel more room; double click the ba
 Last folders | The app opens in the folders each panel was in when you quit (not folders on a server)
 Colored dots | Finder tags: a dot in each tag's color after the name
 Second, slower click on the cursor's name | Rename in place: Enter saves, Esc cancels
-Ctrl+Q | Folder size and info
+Ctrl+Q | Size and info in the other panel. It follows the cursor, so arrowing through folders counts each one, until Esc
 Drag from Finder | Dropping on a panel copies, on a folder row copies into it, with ⌘ moves
 ⌘1 or Ctrl+1 | Sort by name; again reverses it
 ⌘2 or Ctrl+2 | Sort by size, largest first
@@ -41,12 +41,14 @@ F6 | Move to the other panel
 Shift+F6 | Rename
 F7 | New folder
 Shift+F7 | New file: txt, html or md
-⌥F3 | Compare: two marked files, or the files in the two panels (the same name if there is one)
+⌥F2 | Compare: two marked files, or the files in the two panels (the same name if there is one)
+⌥F3 | Preview in the other panel: the file under the cursor, changing as the arrow keys move; Esc closes
 F8 or Delete (⌦) | Delete
 F9 | Bottom terminal, in this folder
 F10 | Writing editor: this HTML file, or a new document
 F11 | Share: the marked files, or the file under the cursor
-F12 | Open the folder in Finder, with the marked files or the file at the cursor selected
+F12 | AI assistant in the other panel (see AI help below); Esc closes
+Shift+F12 | Open the folder in Finder, with the marked files or the file at the cursor selected
 Shift+F9 | Separate Terminal window
 
 ## With Option
@@ -156,6 +158,16 @@ Password | Type it in the password field.
 .pem key | Choose it under Key file. Its permissions are set to 600 if others can read it, because ssh refuses it otherwise. A key's passphrase goes in the password field.
 Through another server | First save that server, then pick it under Connect through. Each server keeps its own password or key. Use this for machines that only accept certain addresses. It also applies to file transfers.
 Leave the password empty and the terminal asks for it, which also suits one-time codes.
+
+## AI help
+F12 opens a chat with an AI in the other panel. Press the gear to choose the service:
+Ollama | Free and private: it runs on this Mac. Install Ollama, run "ollama pull llama3.2", and it works with no key
+OpenRouter, Groq, Gemini | Have free tiers; each needs a free key from its site (the settings link opens the page)
+Claude | By use, with an API key
+Other | Any server with the OpenAI chat API, such as LM Studio
+Load list | Asks the service which models it has; the model box can also be typed in
+Nothing is sent until you press Enter. The box under the chat adds the text file under the cursor to your question. The title bar shows which service and model get the text. Keys are kept in the Keychain.
+In Write (F10) the AI menu fixes spelling, improves, shortens, lengthens, translates, summarizes, continues the text or does what you ask. It works on the selected text, or on the paragraph the cursor is in; ⌘Z undoes it.
 
 ## Writing editor
 F10 opens the HTML or Markdown file under the cursor as you'd read it, or starts a new document in the Balmy style. Write directly on the page; the button for the format at the cursor lights up; the buttons at the top add headings, lists, tables and colored boxes. ⌘⇧K shows the source, ⌘⇧S saves as. In pasted text, tags, attributes and scripts the buttons can't make are removed. The Table menu adds and removes rows and columns. Tab moves to the next cell.

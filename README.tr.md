@@ -24,7 +24,9 @@ macOS için Windows Commander ruhunda, iki panelli yerel dosya yöneticisi. Swif
 - `F3` metin, HTML, Markdown, resim, PDF, video ve ses önizler
 - Finder'dan dosya sürükleyip bırakabilir, Finder'a sürükleyebilirsiniz
 - Ad ve içerik araması, zip ve tar arşivlerine girme, favori klasörler
-- `F11` Mac'in paylaşım menüsünü açar, `⌥F3` iki dosyayı karşılaştırır
+- `F11` Mac'in paylaşım menüsünü açar, `⌥F2` iki dosyayı karşılaştırır
+- `Ctrl+Q` boyut ve bilgiyi diğer panelde gösterir, imleci takip eder; `⌥F3` imleçteki dosyayı orada önizler, listede okla gezdikçe değişir
+- `F12` diğer panelde yapay zekâ sohbeti açar; `Shift+F12` klasörü Finder'da gösterir
 
 ### Sunucular
 
@@ -55,6 +57,10 @@ Resimler gerçek boyutunda açılır. Kırpma, resim ve tuval boyutu, döndürme
 | ![Gölgeli yazı ekleme](docs/images/image-text.jpg) | ![Resim kırpma](docs/images/image-crop.jpg) |
 
 ![Sayfa olarak gösterilen Markdown](docs/images/markdown-preview.jpg)
+
+### Yapay zekâ yardımı (F12 ve Write'ta)
+
+Diğer panelde bir yapay zekâyla sohbet edin ya da yazarken yardım alın: yazım düzeltme, iyileştirme, kısaltma, çeviri, devam ettirme. Ücretsiz seçenekler: Ollama (Mac'inizde çalışır, hesap gerekmez) ile OpenRouter, Groq ve Google Gemini'nin ücretsiz katmanları. Claude ve OpenAI uyumlu her sunucu da çalışır. Siz istemeden hiçbir şey gönderilmez; anahtarlar Anahtar Zinciri'nde kalır.
 
 ### Dosya karşılaştırma
 

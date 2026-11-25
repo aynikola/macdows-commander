@@ -60,6 +60,27 @@ final class RichEditorTests: XCTestCase {
         return result ?? false
     }
 
+    func testAIWorksOnTheSelectionOrTheParagraphAndInsertsWhereAsked() throws {
+        let (editor, _) = try open("<html><head><title>t</title></head><body><article class=\"theme-balmy\"><p>birinci paragraf</p><p>ikinci paragraf</p></article></body></html>")
+        // A selection inside the first paragraph.
+        _ = run(editor, "(() => { const p = document.querySelector('article p'); const r = document.createRange(); r.setStart(p.firstChild, 0); r.setEnd(p.firstChild, 7); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()")
+        let selected = try XCTUnwrap(run(editor, "mc.aiTarget(true)") as? String)
+        XCTAssertTrue(selected.contains("\"text\":\"birinci\""), selected)
+        XCTAssertEqual(run(editor, "mc.aiInsert('ilk', true)") as? Bool, true)
+        spin("replaced") { (run(editor, "mc.html()") as? String)?.contains("<p>ilk paragraf</p>") == true }
+        // Nothing selected: the paragraph the cursor is in.
+        _ = run(editor, "(() => { const p = document.querySelectorAll('article p')[1]; const r = document.createRange(); r.setStart(p.firstChild, 3); r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r); })()")
+        let block = try XCTUnwrap(run(editor, "mc.aiTarget(true)") as? String)
+        XCTAssertTrue(block.contains("\"text\":\"ikinci paragraf\""), block)
+        // Continuing writes after the cursor, in paragraphs, and leaves the rest alone.
+        _ = run(editor, "mc.aiTarget(false)")
+        XCTAssertEqual(run(editor, "mc.aiInsert('yeni bir\\n\\nyeni iki', false)") as? Bool, true)
+        spin("continued") { (run(editor, "mc.html()") as? String)?.contains("yeni iki") == true }
+        let html = try XCTUnwrap(run(editor, "mc.html()") as? String)
+        XCTAssertTrue(html.contains("ikinci paragraf") || html.contains("ikinyeni") || html.contains("yeni bir"), html)
+        XCTAssertEqual(run(editor, "mc.aiInsert('x', true)") as? Bool, false, "nothing happens without a request in flight")
+    }
+
     func testBoldHeadingListTableAndBoxesEditThePage() throws {
         let (editor, url) = try open("<html><head><title>t</title></head><body><article class=\"theme-balmy\"><p>merhaba dünya</p></article></body></html>")
         _ = run(editor, "mc.run('selectAll')")

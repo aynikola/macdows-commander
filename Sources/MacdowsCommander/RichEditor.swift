@@ -465,7 +465,49 @@ final class RichEditorController: NSWindowController, NSWindowDelegate, WKNaviga
       }
       let remembered = null;
 
+      // What the AI helper works on: the selection, or with nothing selected the paragraph the cursor is in.
+      window.__aiRange = null;
+      const aiTarget = (wantBlock) => {
+        root.focus();
+        let range = selectionInside();
+        if (!range) { range = document.createRange(); range.selectNodeContents(root); range.collapse(false); }
+        if (range.collapsed && wantBlock) {
+          let node = range.startContainer;
+          if (node.nodeType !== 1) node = node.parentNode;
+          const block = node.closest('p,h1,h2,h3,h4,h5,h6,li,blockquote,td,th,pre');
+          if (block && root.contains(block)) { range = document.createRange(); range.selectNodeContents(block); }
+        }
+        window.__aiRange = range.cloneRange();
+        const before = document.createRange();
+        before.selectNodeContents(root);
+        before.setEnd(range.startContainer, range.startOffset);
+        return JSON.stringify({ text: range.toString(), before: before.toString().slice(-6000), collapsed: range.collapsed });
+      };
+      // The answer goes where the request was made, even if the cursor has moved since.
+      const aiInsert = (text, replace) => {
+        const range = window.__aiRange;
+        if (!range) return false;
+        root.focus();
+        if (!replace) range.collapse(false);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        const clean = text.replace(/\r/g, '');
+        if (!clean.includes('\n')) {
+          document.execCommand('insertText', false, clean);
+        } else {
+          const html = clean.split(/\n{2,}/).map((part) => '<p>' + escapeText(part).replace(/\n/g, '<br>') + '</p>').join('');
+          document.execCommand('insertHTML', false, html);
+        }
+        window.__aiRange = null;
+        changed();
+        reportState();
+        return true;
+      };
+
       window.mc = {
+        aiTarget,
+        aiInsert,
         reportState: reportState,
         html: () => root.innerHTML,
         clean,
@@ -667,6 +709,9 @@ final class RichEditorController: NSWindowController, NSWindowDelegate, WKNaviga
     private let sourceView = NSTextView()
     private let sourceButton = NSButton()
     private var formatControls: [NSControl] = []
+    private var aiTask: Task<Void, Never>?
+    private let aiStatus = NSTextField(labelWithString: "")
+    private let aiStopButton = NSButton()
     private var sourceAtOpening = ""
     private(set) var isShowingSource = false
     var sourceTextForTests: NSTextView? { isShowingSource ? sourceView : nil }
@@ -985,10 +1030,23 @@ final class RichEditorController: NSWindowController, NSWindowDelegate, WKNaviga
             ], #selector(tableChosen(_:)))),
             tracked("callout", pulldown(L10n.t("rich.box"), boxes, #selector(boxChosen(_:)))),
             tracked("header", pulldown(L10n.t("rich.header"), headers, #selector(boxChosen(_:)))),
+            aiMenu(),
             command("↶", 13, tip: "⌘Z"), command("↷", 14, tip: "⌘⇧Z"),
         ]
         formatControls = views.compactMap { $0 as? NSControl }.filter { $0 !== sourceButton && $0.action != #selector(saveClicked) && $0.action != #selector(saveAsClicked) }
-        let toolbar = NSStackView(views: views + [NSView()])
+        aiStatus.font = AppFont.interface(11)
+        aiStatus.textColor = .secondaryLabelColor
+        aiStatus.lineBreakMode = .byTruncatingTail
+        aiStatus.isHidden = true
+        aiStopButton.title = "■"
+        aiStopButton.bezelStyle = .rounded
+        aiStopButton.controlSize = .small
+        aiStopButton.toolTip = L10n.t("ai.stop")
+        aiStopButton.refusesFirstResponder = true
+        aiStopButton.target = self
+        aiStopButton.action = #selector(aiStopClicked)
+        aiStopButton.isHidden = true
+        let toolbar = NSStackView(views: views + [aiStatus, aiStopButton, NSView()])
         toolbar.spacing = 4
         toolbar.edgeInsets = NSEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
         toolbar.translatesAutoresizingMaskIntoConstraints = false
@@ -1321,5 +1379,138 @@ final class RichEditorController: NSWindowController, NSWindowDelegate, WKNaviga
         webView.configuration.userContentController.removeAllScriptMessageHandlers(from: .defaultClient)
         Self.open.removeAll { $0 === self }
         OpenDocuments.remove(self)
+    }
+}
+
+
+// MARK: AI help
+
+extension RichEditorController {
+    private enum AIAction: String {
+        case improve, fix, shorter, longer, toEnglish, toTurkish, summarize, continueWriting, ask, settings
+        /// Works on the selection or the paragraph, and replaces it.
+        var transforms: Bool { ![.continueWriting, .ask, .settings].contains(self) }
+    }
+
+    fileprivate func aiMenu() -> NSPopUpButton {
+        let actions: [AIAction] = [.improve, .fix, .shorter, .longer, .toEnglish, .toTurkish, .summarize, .continueWriting, .ask]
+        let popup = pulldown("✨ AI", actions.map { (L10n.t("ai.write.\($0.rawValue)"), $0.rawValue) } + [(L10n.t("ai.settings") + "…", AIAction.settings.rawValue)], #selector(aiChosen(_:)))
+        popup.toolTip = L10n.t("ai.write.tip")
+        return popup
+    }
+
+    @objc fileprivate func aiChosen(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String, let action = AIAction(rawValue: raw) else { return }
+        runAI(action)
+    }
+
+    /// For tests: runs a menu action by its name.
+    func triggerAI(_ name: String) {
+        if let action = AIAction(rawValue: name) { runAI(action) }
+    }
+
+    @objc fileprivate func aiStopClicked() { aiTask?.cancel() }
+
+    private static let aiSystem = "You are a writing assistant inside a word processor. Return ONLY the resulting text: no explanation, no quotation marks around it, no code fences, no headings you were not asked for. Keep the language of the text unless asked to translate. Separate paragraphs with a blank line."
+
+    private func aiNotice(_ text: String) {
+        guard let window else { return }
+        let alert = NSAlert()
+        alert.messageText = text
+        alert.addButton(withTitle: L10n.t("common.ok"))
+        alert.beginSheetModal(for: window)
+    }
+
+    private func runAI(_ action: AIAction) {
+        if action == .settings {
+            AISettingsForm.present(on: window)
+            return
+        }
+        guard !isShowingSource else { return aiNotice(L10n.t("ai.write.needVisual")) }
+        guard aiTask == nil else { return }
+        let config = AISettingsStore().load()
+        guard config.isReady else {
+            aiNotice(L10n.t("ai.notReady"))
+            AISettingsForm.present(on: window)
+            return
+        }
+        if action == .ask {
+            askForText(title: L10n.t("ai.write.askTitle"), placeholder: L10n.t("ai.write.askHint")) { [weak self] instruction in
+                if let instruction { self?.startAI(.ask, instruction: instruction, config: config) }
+            }
+        } else {
+            startAI(action, instruction: nil, config: config)
+        }
+    }
+
+    private func startAI(_ action: AIAction, instruction: String?, config: AIConfig) {
+        evaluate("mc.aiTarget(\(action.transforms))") { [weak self] result in
+            guard let self, let json = result as? String,
+                  let data = json.data(using: .utf8), let target = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+            let text = target["text"] as? String ?? ""
+            let before = target["before"] as? String ?? ""
+            let hasText = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            if action.transforms, !hasText { return self.aiNotice(L10n.t("ai.write.nothing")) }
+            if action == .continueWriting, before.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return self.aiNotice(L10n.t("ai.write.nothing")) }
+
+            let prompt: String
+            var replace = true
+            switch action {
+            case .improve: prompt = "Improve the clarity and style of this text. Keep its meaning and about the same length:\n\n\(text)"
+            case .fix: prompt = "Fix the spelling, grammar and punctuation of this text. Change nothing else:\n\n\(text)"
+            case .shorter: prompt = "Make this text shorter and keep the key points:\n\n\(text)"
+            case .longer: prompt = "Expand this text with more detail, in the same style:\n\n\(text)"
+            case .toEnglish: prompt = "Translate this text to English:\n\n\(text)"
+            case .toTurkish: prompt = "Translate this text to Turkish:\n\n\(text)"
+            case .summarize: prompt = "Summarize this text in a few sentences:\n\n\(text)"
+            case .continueWriting:
+                replace = false
+                prompt = "Continue writing from exactly where this text stops. Write the next one to three paragraphs and do not repeat the text:\n\n\(before)"
+            case .ask:
+                if hasText {
+                    prompt = "Instruction: \(instruction ?? "")\n\nApply it to this text and return the result:\n\n\(text)"
+                } else {
+                    replace = false
+                    prompt = "Instruction: \(instruction ?? "")\n\nThe text written so far (it may be empty):\n\(before)\n\nWrite what the instruction asks for. It will be inserted at the cursor."
+                }
+            case .settings: return
+            }
+            // A selection that ends in a space keeps it: the answer is put back with the same spaces around it.
+            let isSpace: (Character) -> Bool = { $0 == " " || $0 == "\t" || $0 == "\u{00A0}" }
+            let padding = replace && action.transforms ? (String(text.prefix(while: isSpace)), String(String(text.reversed().prefix(while: isSpace)).reversed())) : ("", "")
+            self.runAIRequest(config: config, messages: [AIMessage(.system, Self.aiSystem), AIMessage(.user, prompt)], replace: replace, padding: padding)
+        }
+    }
+
+    private func setAIBusy(_ busy: Bool, text: String = "") {
+        aiStatus.stringValue = text
+        aiStatus.isHidden = !busy
+        aiStopButton.isHidden = !busy
+    }
+
+    private func runAIRequest(config: AIConfig, messages: [AIMessage], replace: Bool, padding: (String, String)) {
+        setAIBusy(true, text: L10n.t("ai.write.working"))
+        aiTask = Task { @MainActor [weak self] in
+            var answer = ""
+            do {
+                for try await piece in AIClient(config: config).stream(messages) { answer += piece }
+            } catch {
+                guard let self else { return }
+                self.setAIBusy(false)
+                self.aiTask = nil
+                if !(error is CancellationError) { self.aiNotice(error.localizedDescription) }
+                self.evaluate("window.__aiRange = null")
+                return
+            }
+            guard let self else { return }
+            self.setAIBusy(false)
+            self.aiTask = nil
+            let result = answer.trimmingCharacters(in: .whitespacesAndNewlines)
+            if result.isEmpty {
+                self.evaluate("window.__aiRange = null")
+                return self.aiNotice(L10n.t("ai.empty"))
+            }
+            self.evaluate("mc.aiInsert(\(Self.quoted(padding.0 + result + padding.1)), \(replace))")
+        }
     }
 }

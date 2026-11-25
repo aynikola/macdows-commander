@@ -21,7 +21,7 @@ Paneller arasındaki çubuğu sürükleme | Bir panele daha çok yer verir; çub
 Son klasörler | Uygulama, kapattığınızda panellerin bulunduğu klasörlerde açılır (sunucudaki klasörler hariç)
 Renkli noktalar | Finder etiketleri: adın yanında her etiketin renginde bir nokta
 İmleçteki ada yavaşça bir daha tıklamak | Adı yerinde değiştir: Enter kaydeder, Esc vazgeçer
-Ctrl+Q | Klasör boyutu ve bilgi
+Ctrl+Q | Boyut ve bilgi, diğer panelde. İmleci takip eder: klasörlerde okla gezdikçe her birinin boyutu hesaplanır, Esc'e basana kadar
 Finder'dan sürükle | Panele bırakınca kopyalar, klasör satırına bırakınca içine, ⌘ ile taşır
 ⌘1 veya Ctrl+1 | Ada göre sırala; yine basınca ters çevir
 ⌘2 veya Ctrl+2 | Boyuta göre sırala, önce en büyük
@@ -41,12 +41,14 @@ F6 | Diğer panele taşı
 Shift+F6 | Yeniden adlandır
 F7 | Yeni klasör
 Shift+F7 | Yeni dosya: txt, html veya md
-⌥F3 | Karşılaştır: iki işaretli dosya, veya iki paneldeki dosyalar (aynı adlı varsa o)
+⌥F2 | Karşılaştır: iki işaretli dosya, veya iki paneldeki dosyalar (aynı adlı varsa o)
+⌥F3 | Diğer panelde önizleme: imleçteki dosya, ok tuşlarıyla gezdikçe değişir; Esc kapatır
 F8 veya Delete (⌦) | Sil
 F9 | Alttaki terminal, bu klasörde
 F10 | Yazı editörü: bu HTML dosyası veya yeni belge
 F11 | Paylaş: işaretli dosyalar veya imlecin üstündeki dosya
-F12 | Klasörü Finder'da aç; işaretli dosyalar veya imleçteki dosya seçili gelir
+F12 | Diğer panelde yapay zekâ asistanı (aşağıdaki Yapay zekâ yardımına bakın); Esc kapatır
+Shift+F12 | Klasörü Finder'da aç; işaretli dosyalar veya imleçteki dosya seçili gelir
 Shift+F9 | Ayrı Terminal penceresi
 
 ## Option ile
@@ -156,6 +158,16 @@ Parola | Parola alanına yazın.
 .pem anahtar | Anahtar dosyası alanından seçin. Başkaları okuyabiliyorsa izni 600 yapılır, yoksa ssh kabul etmez. Anahtarın parolası parola alanına yazılır.
 Başka sunucu üzerinden | Önce o sunucuyu kaydedin, sonra Şunun üzerinden alanından seçin. Her sunucunun parolası veya anahtarı ayrıdır. Yalnızca belirli adreslere açık makineler için kullanın. Dosya aktarımında da geçerlidir.
 Parolayı boş bırakırsanız terminal sorar; tek kullanımlık kodlar için de bu uygundur.
+
+## Yapay zekâ yardımı
+F12 diğer panelde bir yapay zekâyla sohbet açar. Servisi seçmek için ⚙ düğmesine basın:
+Ollama | Ücretsiz ve gizli: bu Mac'te çalışır. Ollama'yı kurun, "ollama pull llama3.2" çalıştırın; anahtar gerekmez
+OpenRouter, Groq, Gemini | Ücretsiz katmanları var; her biri kendi sitesinden ücretsiz bir anahtar ister (ayardaki bağlantı sayfayı açar)
+Claude | Kullanıma göre ücretli, API anahtarıyla
+Diğer | OpenAI sohbet arayüzü olan her sunucu, örneğin LM Studio
+Listele | Servise hangi modelleri sunduğunu sorar; model kutusuna elle de yazılabilir
+Siz Enter'a basmadan hiçbir şey gönderilmez. Sohbetin altındaki kutu, imleçteki metin dosyasını sorunuza ekler. Başlık çubuğu metnin hangi servise ve modele gittiğini gösterir. Anahtarlar Anahtar Zinciri'nde saklanır.
+Write'ta (F10) AI menüsü yazım hatalarını düzeltir, metni iyileştirir, kısaltır, uzatır, çevirir, özetler, yazıya devam eder ya da istediğinizi yapar. Seçili metinde, seçim yoksa imlecin olduğu paragrafta çalışır; ⌘Z geri alır.
 
 ## Yazı editörü
 F10 imlecin üstündeki HTML veya Markdown dosyasını okunacağı haliyle açar, başka yerdeyseniz Balmy stilinde yeni belge başlatır. Doğrudan sayfanın üstüne yazarsınız; imlecin bulunduğu biçimin düğmesi üstte vurgulanır; üstteki düğmeler başlık, liste, tablo ve renkli kutu ekler. ⌘⇧K kaynağı gösterir, ⌘⇧S farklı kaydeder. Yapıştırılan metinde düğmelerle yapılabilenler dışındaki etiket, öznitelik ve betikler silinir. Tablo menüsü satır ve sütun ekler, siler. Tab sonraki hücreye geçer.

@@ -263,7 +263,7 @@ final class MainWindowTests: XCTestCase {
         XCTAssertTrue(pair.second.1 === controller.right)
         var shown: CompareWindowController?
         controller.onCompared = { shown = $0 }
-        controller.left.table.keyDown(with: key(99, flags: .option))
+        controller.left.table.keyDown(with: key(120, flags: .option))
         spin("compared") { shown != nil }
         XCTAssertFalse(try XCTUnwrap(shown).changes.isEmpty)
         shown?.moveChange(by: 1)
@@ -449,12 +449,64 @@ final class MainWindowTests: XCTestCase {
         var done = false
         panel.load(path: root.path, select: "file.txt") { _ in done = true }
         spin("loaded") { done }
-        panel.table.keyDown(with: key(111))
+        panel.table.keyDown(with: key(111, flags: .shift))
         XCTAssertEqual(shown.map(\.path), [root.appendingPathComponent("file.txt").path])
         panel.select(name: "..")
-        panel.table.keyDown(with: key(111))
+        panel.table.keyDown(with: key(111, flags: .shift))
         XCTAssertEqual(shown.map(\.path), [root.path], "on .. the folder itself opens")
         XCTAssertTrue(controller.functionButtonKeys.contains("F12"))
+        shown = []
+        panel.table.keyDown(with: key(111))
+        XCTAssertTrue(shown.isEmpty, "plain F12 no longer opens Finder")
+        XCTAssertEqual(controller.sidePaneTitle, L10n.t("side.ai"), "it opens the AI pane instead")
+        XCTAssertTrue(controller.sidePaneHostPanel === controller.right, "over the panel that is not active")
+        panel.table.keyDown(with: key(53))
+        XCTAssertNil(controller.sidePaneTitle, "Esc closes it")
+    }
+
+    func testCtrlQShowsTheSizeInTheOtherPanelAndFollowsTheCursor() throws {
+        let small = root.appendingPathComponent("kucuk"), big = root.appendingPathComponent("buyuk")
+        for folder in [small, big] { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+        try Data(count: 1000).write(to: small.appendingPathComponent("a.bin"))
+        try Data(count: 5000).write(to: big.appendingPathComponent("b.bin"))
+        let panel = controller.left
+        controller.activate(panel)
+        var done = false
+        panel.load(path: root.path, select: "kucuk") { _ in done = true }
+        spin("loaded") { done }
+        panel.table.keyDown(with: key(12, flags: .control))
+        XCTAssertTrue(controller.sidePaneHostPanel === controller.right, "the size appears in the right panel")
+        spin("small folder counted") { controller.sideInfoText?.contains(Format.exact(1000)) == true }
+        XCTAssertTrue(controller.sideInfoText?.contains("kucuk") == true)
+        panel.select(name: "buyuk")
+        spin("big folder counted as the cursor moves") { controller.sideInfoText?.contains(Format.exact(5000)) == true }
+        XCTAssertNotNil(controller.sidePaneTitle, "it stays until Esc")
+        panel.table.keyDown(with: key(125))
+        XCTAssertNotNil(controller.sidePaneTitle)
+        panel.table.keyDown(with: key(53))
+        XCTAssertNil(controller.sidePaneTitle)
+    }
+
+    func testOptionF3PreviewsInTheOtherPanelAndFollowsTheArrowKeys() throws {
+        try "merhaba onizleme".write(to: root.appendingPathComponent("not.txt"), atomically: true, encoding: .utf8)
+        let image = NSImage(size: NSSize(width: 20, height: 20), flipped: false) { rect in NSColor.red.setFill(); rect.fill(); return true }
+        let tiff = try XCTUnwrap(image.tiffRepresentation)
+        try XCTUnwrap(NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])).write(to: root.appendingPathComponent("resim.png"))
+        let panel = controller.left
+        controller.activate(panel)
+        var done = false
+        panel.load(path: root.path, select: "not.txt") { _ in done = true }
+        spin("loaded") { done }
+        panel.table.keyDown(with: key(99, flags: .option))
+        XCTAssertEqual(controller.sidePaneTitle, L10n.t("side.preview"))
+        XCTAssertTrue(controller.sidePaneHostPanel === controller.right)
+        spin("text shown") { controller.sidePreview?.kind == .text && controller.sidePreview?.shownText.contains("merhaba onizleme") == true }
+        panel.select(name: "resim.png")
+        spin("image shown as the cursor moves") { controller.sidePreview?.kind == .image }
+        panel.select(name: "one")
+        spin("a folder lists what is in it") { controller.sidePreview?.kind == .text }
+        panel.table.keyDown(with: key(99, flags: .option))
+        XCTAssertNil(controller.sidePaneTitle, "the same key again closes it")
     }
 
     func testGitButtonsAreListedAndChangesWaitForEnter() {
@@ -568,6 +620,9 @@ final class MainWindowTests: XCTestCase {
         spin("right loaded") { done }
         let reopened = MainWindowController()
         defer { reopened.window?.close() }
+        // The first load of each panel must open the remembered folder too, not the home folder.
+        let settle = Date().addingTimeInterval(0.8)
+        while Date() < settle { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
         XCTAssertEqual(reopened.left.path, root.appendingPathComponent("one").path)
         XCTAssertEqual(reopened.right.path, root.appendingPathComponent("two").path)
     }

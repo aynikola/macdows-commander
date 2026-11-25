@@ -13,6 +13,24 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
     private let favoriteToggle = NSButton()
     private var favoriteChips: [NSButton] = []
     private(set) var panelSplit: PanelSplitView?
+
+    // What the tests look at: the pane laid over the other panel.
+    var sidePaneTitle: String? { sidePane?.title }
+    var sidePaneHostPanel: PanelController? { sideHost }
+    var sideInfoText: String? { infoContent?.plainText }
+    var sidePreview: PreviewPaneContent? { previewContent }
+
+    /// The pane laid over the panel that is not active: size info, preview or the AI chat.
+    private enum SideMode { case info, preview, ai }
+    private var sidePane: SidePaneView?
+    private var sideMode: SideMode?
+    private weak var sideHost: PanelController?
+    private var sideToken = 0
+    private var sideDebounce: DispatchWorkItem?
+    private var infoContent: InfoPaneContent?
+    private var infoFinderPath: String?
+    private var previewContent: PreviewPaneContent?
+    private var aiChat: AIChatView?
     private var topBar: NSStackView!
     private var queueTimer: Timer?
     private var siteManager: SiteManagerController?
@@ -108,12 +126,13 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
 
         // open -n "Macdows Commander.app" --args --left <folder> --right <folder>
         let arguments = ProcessInfo.processInfo.arguments
-        let startPath = { (flag: String) -> String in
-            guard let index = arguments.firstIndex(of: flag), index + 1 < arguments.count else { return home }
+        // Without a flag each panel opens where it was when the app was last used.
+        let startPath = { (flag: String, remembered: String) -> String in
+            guard let index = arguments.firstIndex(of: flag), index + 1 < arguments.count else { return remembered }
             return arguments[index + 1]
         }
-        left.load(path: startPath("--left"), select: nil)
-        right.load(path: startPath("--right"), select: nil)
+        left.load(path: startPath("--left", left.path), select: nil)
+        right.load(path: startPath("--right", right.path), select: nil)
         window.makeFirstResponder(left.table)
     }
 
@@ -187,7 +206,7 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
             ("F9", "key.terminal", #selector(terminalClicked)),
             ("F10", "key.write", #selector(writerClicked)),
             ("F11", "key.share", #selector(shareClicked(_:))),
-            ("F12", "key.finder", #selector(finderClicked(_:))),
+            ("F12", "key.ai", #selector(aiClicked(_:))),
         ]
         var buttons: [NSButton] = []
         for (key, labelKey, action) in definitions {
@@ -269,6 +288,11 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
         panel.onCursorChange = { [weak self, weak panel] in
             guard let self, panel === self.active else { return }
             self.showActivePath()
+            self.refreshSidePane()
+        }
+        panel.onMarksChange = { [weak self, weak panel] in
+            guard let self, panel === self.active else { return }
+            self.refreshSidePane()
         }
         panel.table.onSlowClick = { [weak panel] row in panel?.beginRename(row: row) }
         panel.table.onEditEnded = { [weak panel] in panel?.renameEnded() }
@@ -341,6 +365,7 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
     private func refreshActive() {
         if window?.firstResponder === left.table { lastActive = left }
         if window?.firstResponder === right.table { lastActive = right }
+        if sideMode != nil, let host = sideHost, active === host { moveSidePane() }
         left.refreshChrome()
         right.refreshChrome()
         left.table.setNeedsDisplay(left.table.visibleRect)
@@ -363,6 +388,10 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
 
     private func handleKey(_ event: NSEvent, panel: PanelController) -> Bool {
         let flags = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        if flags.isEmpty, event.keyCode == 53, sideMode != nil { // Esc
+            closeSidePane()
+            return true
+        }
         if flags == .control, let key = event.charactersIgnoringModifiers, let order = ["1": "name", "2": "size", "3": "date", "4": "recent"][key] {
             panel.sort(by: order)
             return true
@@ -378,7 +407,8 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
         if flags == .option {
             switch event.keyCode {
             case 122: HelpWindowController.show() // Option+F1
-            case 99: compareFiles() // Option+F3
+            case 120: compareFiles() // Option+F2
+            case 99: toggleSidePane(.preview) // Option+F3
             case 96: startPack() // Option+F5
             case 101: showFTPMenu(nil) // Option+F9
             case 109: showTerminalMenu(nil) // Option+F10
@@ -424,7 +454,8 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
             if shift { openTerminal() } else { showTerminal() }
         case 109: openWriter() // F10
         case 103: shareFiles() // F11
-        case 111: showInFinder() // F12
+        case 111: // F12
+            if shift { showInFinder() } else { toggleSidePane(.ai) }
         default:
             return panel.jumpToName(typed: event.characters ?? "")
         }
@@ -1494,79 +1525,7 @@ final class MainWindowController: NSWindowController, NSTextFieldDelegate, NSWin
 
     // MARK: F2: size
 
-    private func showInfo() {
-        let panel = active
-        guard let window, let cursor = panel.cursorEntry else { return }
-        let source = panel.source
-        var directory = panel.path
-        var entries = panel.selection
-        var title = entries.count == 1 ? entries[0].name : L10n.t("info.items", String(entries.count))
-        var whole = false
-        if entries.isEmpty, cursor.name == ".." {
-            // On ".." the answer is about the folder you are in.
-            whole = true
-            title = PathUtil.lastComponent(panel.path)
-            directory = panel.path
-            entries = panel.rows.filter { $0.name != ".." }
-        }
-        let location = whole ? PathUtil.parent(panel.path) : panel.path
-        let single = !whole && entries.count == 1 ? entries[0] : nil
-
-        let alert = NSAlert()
-        alert.messageText = title
-        let body = { [weak panel] (totals: SizeTotals?) -> String in
-            let wait = L10n.t("info.calculating")
-            var lines = [L10n.t("info.location") + ": " + location]
-            if let totals {
-                lines.append(L10n.t("info.size") + ": " + Format.size(totals.bytes) + " (" + Format.exact(totals.bytes) + " " + L10n.t("info.bytes") + ")")
-                lines.append(L10n.t("info.onDisk") + ": " + (panel?.source.isRemote == false ? Format.size(totals.bytesOnDisk) : L10n.t("info.notAvailable")))
-                lines.append(L10n.t("info.contains") + ": " + L10n.t("info.containsValue", String(totals.files), String(totals.folders - (single?.isDirectory == true ? 1 : 0))))
-            } else {
-                lines += [L10n.t("info.size") + ": " + wait, L10n.t("info.onDisk") + ": " + wait, L10n.t("info.contains") + ": " + wait]
-            }
-            if let single {
-                lines.append(L10n.t("info.permissions") + ": " + (single.permissions ?? "—"))
-                lines.append(L10n.t("info.owner") + ": " + (single.owner ?? "—"))
-            }
-            return lines.joined(separator: "\n")
-        }
-        alert.informativeText = body(nil)
-        alert.addButton(withTitle: L10n.t("common.close")).keyEquivalent = "\u{1b}"
-        let canFinder = !source.isRemote && entries.count == 1 || whole && !source.isRemote
-        if canFinder { alert.addButton(withTitle: L10n.t("info.finder")) }
-
-        final class Flag { var cancelled = false }
-        let flag = Flag()
-        let finderPath = whole ? panel.path : PathUtil.join(panel.path, entries.first?.name ?? "")
-        alert.beginSheetModal(for: window) { [weak self] response in
-            flag.cancelled = true
-            if response == .alertSecondButtonReturn { self?.openFinderInfo(finderPath) }
-        }
-        DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                let totals = try SizeCalculator.total(of: entries, in: directory, source: source) { flag.cancelled }
-                DispatchQueue.main.async { [weak panel] in
-                    guard !flag.cancelled else { return }
-                    alert.informativeText = body(totals)
-                    alert.layout()
-                    if let only = single, only.isDirectory { panel?.setComputedSize(totals.bytes, for: only.name) }
-                }
-                // Marked folders each get their own figure in the list.
-                if single == nil && !whole {
-                    for entry in entries where entry.isDirectory {
-                        let inner = try SizeCalculator.total(of: [entry], in: directory, source: source) { flag.cancelled }
-                        DispatchQueue.main.async { [weak panel] in panel?.setComputedSize(inner.bytes, for: entry.name) }
-                    }
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    guard !flag.cancelled else { return }
-                    alert.informativeText = error.localizedDescription
-                    alert.layout()
-                }
-            }
-        }
-    }
+    private func showInfo() { toggleSidePane(.info) }
 
     private func openFinderInfo(_ path: String) {
         let escaped = path.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
@@ -2482,5 +2441,268 @@ extension RichEditorController {
         onSaved = { [weak panel] in panel?.reload() }
         onMessage = { [weak controller] in controller?.showToast($0) }
         return self
+    }
+}
+
+
+// MARK: Side pane (Ctrl+Q, ⌥F3, F12)
+
+extension MainWindowController {
+    @objc func previewPaneClicked(_ sender: Any?) { toggleSidePane(.preview) }
+    @objc func aiClicked(_ sender: Any?) { toggleSidePane(.ai) }
+
+    private func toggleSidePane(_ mode: SideMode) {
+        if sideMode == mode {
+            closeSidePane()
+        } else {
+            openSidePane(mode)
+        }
+    }
+
+    private func openSidePane(_ mode: SideMode) {
+        let host = other
+        if sidePane == nil || sideHost !== host {
+            removeSidePaneView()
+            let pane = SidePaneView()
+            pane.onClose = { [weak self] in self?.closeSidePane() }
+            host.view.addSubview(pane)
+            NSLayoutConstraint.activate([
+                pane.topAnchor.constraint(equalTo: host.view.topAnchor),
+                pane.bottomAnchor.constraint(equalTo: host.view.bottomAnchor),
+                pane.leadingAnchor.constraint(equalTo: host.view.leadingAnchor),
+                pane.trailingAnchor.constraint(equalTo: host.view.trailingAnchor),
+            ])
+            sidePane = pane
+            sideHost = host
+        }
+        sideMode = mode
+        guard let pane = sidePane else { return }
+        switch mode {
+        case .info:
+            let content = infoContent ?? InfoPaneContent()
+            infoContent = content
+            content.finderButton.title = L10n.t("info.finder")
+            content.finderButton.target = self
+            content.finderButton.action = #selector(infoFinderClicked)
+            pane.title = L10n.t("side.info")
+            pane.setBody(content)
+        case .preview:
+            let content = previewContent ?? PreviewPaneContent()
+            previewContent = content
+            pane.title = L10n.t("side.preview")
+            pane.setBody(content)
+        case .ai:
+            let chat = aiChat ?? makeAIChat()
+            aiChat = chat
+            pane.title = L10n.t("side.ai")
+            pane.detail = chat.summary
+            pane.setBody(chat)
+            chat.refreshContext()
+            window?.makeFirstResponder(chat.input)
+        }
+        refreshSidePane(immediately: true)
+    }
+
+    private func removeSidePaneView() {
+        previewContent?.stop()
+        sidePane?.removeFromSuperview()
+        sidePane = nil
+        sideHost = nil
+    }
+
+    private func closeSidePane() {
+        sideToken += 1
+        sideDebounce?.cancel()
+        removeSidePaneView()
+        sideMode = nil
+        activate(active)
+    }
+
+    /// The keyboard went to the panel the pane was covering: the pane moves to the other one.
+    private func moveSidePane() {
+        guard let mode = sideMode else { return }
+        sideToken += 1
+        removeSidePaneView()
+        openSidePane(mode)
+    }
+
+    private func refreshSidePane(immediately: Bool = false) {
+        guard let mode = sideMode else { return }
+        sideDebounce?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.updateSidePane() }
+        sideDebounce = work
+        // Quick on this Mac; on a server every folder size costs round trips, so it waits for the cursor to rest.
+        let remote = active.source.isRemote
+        let delay: TimeInterval = immediately ? 0 : (mode == .info ? (remote ? 0.8 : 0.15) : (remote ? 0.6 : 0.08))
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+    }
+
+    private func updateSidePane() {
+        switch sideMode {
+        case .info: updateInfoPane()
+        case .preview: updatePreviewPane()
+        case .ai: aiChat?.refreshContext()
+        case .none: break
+        }
+    }
+
+    private func makeAIChat() -> AIChatView {
+        let chat = AIChatView()
+        chat.contextProvider = { [weak self] in
+            // The file under the cursor, when it is text on this Mac: nothing goes to a service unless the box is ticked.
+            guard let self, let entry = self.active.cursorEntry, !entry.isDirectory, entry.name != "..", !self.active.source.isRemote, entry.size < 5 << 20,
+                  let text = TextViewerController.readText(URL(fileURLWithPath: PathUtil.join(self.active.path, entry.name))) else { return nil }
+            return (entry.name, text)
+        }
+        chat.onSettings = { [weak self, weak chat] in
+            AISettingsForm.present(on: self?.window) { chat?.configChanged() }
+        }
+        chat.onEscape = { [weak self] in self?.closeSidePane() }
+        chat.onConfigChange = { [weak self] summary in self?.sidePane?.detail = summary }
+        return chat
+    }
+
+    // MARK: Info
+
+    @objc private func infoFinderClicked() {
+        if let path = infoFinderPath { openFinderInfo(path) }
+    }
+
+    private func updateInfoPane() {
+        guard let content = infoContent, let pane = sidePane else { return }
+        let panel = active
+        sideToken += 1
+        let token = sideToken
+        guard let cursor = panel.cursorEntry else {
+            content.show(title: "", lines: [])
+            return
+        }
+        let source = panel.source
+        var entries = panel.selection
+        var title = entries.count == 1 ? entries[0].name : L10n.t("info.items", String(entries.count))
+        var whole = false
+        if entries.isEmpty, cursor.name == ".." {
+            // On ".." the answer is about the folder you are in.
+            whole = true
+            title = PathUtil.lastComponent(panel.path)
+            entries = panel.rows.filter { $0.name != ".." }
+        }
+        let directory = panel.path
+        let location = whole ? PathUtil.parent(panel.path) : panel.path
+        let single = !whole && entries.count == 1 ? entries[0] : nil
+        pane.detail = location
+        infoFinderPath = nil
+        if !source.isRemote, whole || entries.count == 1 {
+            infoFinderPath = whole ? panel.path : PathUtil.join(panel.path, entries[0].name)
+        }
+        content.finderButton.isHidden = infoFinderPath == nil
+
+        let lines = { (totals: SizeTotals?) -> [(String, String)] in
+            let wait = L10n.t("info.calculating")
+            var rows = [(L10n.t("info.location"), location)]
+            if let totals {
+                rows.append((L10n.t("info.size"), Format.size(totals.bytes) + " (" + Format.exact(totals.bytes) + " " + L10n.t("info.bytes") + ")"))
+                rows.append((L10n.t("info.onDisk"), source.isRemote ? L10n.t("info.notAvailable") : Format.size(totals.bytesOnDisk)))
+                rows.append((L10n.t("info.contains"), L10n.t("info.containsValue", String(totals.files), String(totals.folders - (single?.isDirectory == true ? 1 : 0)))))
+            } else {
+                rows += [(L10n.t("info.size"), wait), (L10n.t("info.onDisk"), wait), (L10n.t("info.contains"), wait)]
+            }
+            if let single {
+                rows.append((L10n.t("info.modified"), Format.date(single.date)))
+                rows.append((L10n.t("info.permissions"), single.permissions ?? "—"))
+                rows.append((L10n.t("info.owner"), single.owner ?? "—"))
+            }
+            return rows
+        }
+        content.show(title: title, lines: lines(nil))
+
+        // Moving on cancels the count that is still running, so arrowing through folders never piles work up.
+        DispatchQueue.global(qos: .userInitiated).async { [weak self, weak panel] in
+            let cancelled: () -> Bool = { [weak self] in self?.sideToken != token }
+            do {
+                let totals = try SizeCalculator.total(of: entries, in: directory, source: source, isCancelled: cancelled)
+                DispatchQueue.main.async {
+                    guard let self, self.sideToken == token else { return }
+                    self.infoContent?.show(title: title, lines: lines(totals))
+                    if let only = single, only.isDirectory { panel?.setComputedSize(totals.bytes, for: only.name) }
+                }
+                // Marked folders each get their own figure in the list.
+                if single == nil && !whole {
+                    for entry in entries where entry.isDirectory {
+                        let inner = try SizeCalculator.total(of: [entry], in: directory, source: source, isCancelled: cancelled)
+                        DispatchQueue.main.async { if self?.sideToken == token { panel?.setComputedSize(inner.bytes, for: entry.name) } }
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    guard let self, self.sideToken == token, !((error as? MCError)?.isCancelled ?? false) else { return }
+                    self.infoContent?.show(title: title, lines: [(L10n.t("info.location"), location), ("", error.localizedDescription)])
+                }
+            }
+        }
+    }
+
+    // MARK: Preview
+
+    private static let previewTextLimit = 200_000
+    private static let previewRemoteLimit: Int64 = 8 << 20
+
+    private func updatePreviewPane() {
+        guard let content = previewContent, let pane = sidePane else { return }
+        let panel = active
+        sideToken += 1
+        let token = sideToken
+        guard let entry = panel.cursorEntry else {
+            content.show(message: "")
+            return
+        }
+        pane.detail = entry.name == ".." ? panel.path : entry.name
+        if entry.name == ".." {
+            content.show(message: panel.path)
+            return
+        }
+        if entry.isDirectory {
+            let source = panel.source
+            let path = PathUtil.join(panel.path, entry.name)
+            content.show(message: L10n.t("info.calculating"))
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                let names = ((try? source.list(path)) ?? []).sorted { ($0.isDirectory ? 0 : 1, $0.name.lowercased()) < ($1.isDirectory ? 0 : 1, $1.name.lowercased()) }
+                let text = names.prefix(300).map { ($0.isDirectory ? "▸ " : "   ") + $0.name }.joined(separator: "\n")
+                DispatchQueue.main.async {
+                    guard let self, self.sideToken == token else { return }
+                    let more = names.count > 300 ? "\n…" : ""
+                    self.previewContent?.show(text: names.isEmpty ? L10n.t("preview.emptyFolder") : text + more, monospaced: false)
+                }
+            }
+            return
+        }
+        if panel.source.isRemote, entry.size > Self.previewRemoteLimit {
+            content.show(message: L10n.t("preview.tooBig", Format.size(entry.size)))
+            return
+        }
+        if panel.source.isRemote { content.show(message: L10n.t("status.downloading", entry.name)) }
+        localCopy(of: entry, in: panel) { [weak self] url in
+            guard let self, self.sideToken == token, let content = self.previewContent else { return }
+            guard let url else { return content.show(message: L10n.t("preview.none", entry.name)) }
+            if self.isImage(entry.name) {
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let decoded = ImageDecoder.decode(url, maxPixels: 1800)
+                    DispatchQueue.main.async {
+                        guard self.sideToken == token else { return }
+                        if let decoded { self.previewContent?.show(image: decoded.image) } else { self.previewContent?.show(message: L10n.t("preview.none", entry.name)) }
+                    }
+                }
+            } else if MediaViewerController.isMedia(entry.name) {
+                content.show(media: url)
+            } else {
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let text = TextViewerController.readText(url)
+                    DispatchQueue.main.async {
+                        guard self.sideToken == token else { return }
+                        if let text { self.previewContent?.show(text: String(text.prefix(Self.previewTextLimit))) } else { self.previewContent?.show(message: L10n.t("preview.none", entry.name)) }
+                    }
+                }
+            }
+        }
     }
 }
