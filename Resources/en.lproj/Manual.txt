@@ -160,10 +160,15 @@ Through another server | First save that server, then pick it under Connect thro
 Leave the password empty and the terminal asks for it, which also suits one-time codes.
 
 ## AI help
-F12 opens a chat with an AI in the other panel. Press the gear to choose the service:
-Ollama | Free and private: it runs on this Mac. Install Ollama, run "ollama pull llama3.2", and it works with no key
-OpenRouter, Groq, Gemini | Have free tiers; each needs a free key from its site (the settings link opens the page)
-Claude | By use, with an API key
+F12 opens a chat with an AI in the other panel.
+Press Settings (also File > AI Settings…, or AI > AI Settings in Write) to choose the service and paste its key; the link there opens the page where the key is made:
+Google Gemini | Free tier, no card: a key from Google AI Studio
+Groq, Cerebras | Free tiers and very fast: a free key from their sites
+OpenRouter | Models ending in :free cost nothing: a free key
+Mistral | The free Experiment plan: a key from the Mistral console
+GitHub Models | Free with a GitHub account: a token with the Models permission as the key
+Grok (xAI) | Paid by use, with a key from the xAI console
+Claude | Paid by use, with an API key
 Other | Any server with the OpenAI chat API, such as LM Studio
 Load list | Asks the service which models it has; the model box can also be typed in
 Nothing is sent until you press Enter. The box under the chat adds the text file under the cursor to your question. The title bar shows which service and model get the text. Keys are kept in the Keychain.

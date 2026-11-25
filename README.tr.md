@@ -60,7 +60,7 @@ Resimler gerçek boyutunda açılır. Kırpma, resim ve tuval boyutu, döndürme
 
 ### Yapay zekâ yardımı (F12 ve Write'ta)
 
-Diğer panelde bir yapay zekâyla sohbet edin ya da yazarken yardım alın: yazım düzeltme, iyileştirme, kısaltma, çeviri, devam ettirme. Ücretsiz seçenekler: Ollama (Mac'inizde çalışır, hesap gerekmez) ile OpenRouter, Groq ve Google Gemini'nin ücretsiz katmanları. Claude ve OpenAI uyumlu her sunucu da çalışır. Siz istemeden hiçbir şey gönderilmez; anahtarlar Anahtar Zinciri'nde kalır.
+Diğer panelde bir yapay zekâyla sohbet edin ya da yazarken yardım alın: yazım düzeltme, iyileştirme, kısaltma, çeviri, devam ettirme. Ücretsiz seçenekler: Google Gemini, Groq, Cerebras, Mistral, GitHub Models ve OpenRouter'ın ücretsiz modelleri; hepsi ücretsiz bir anahtarla. Grok (xAI), Claude ve OpenAI uyumlu her sunucu da çalışır. Siz istemeden hiçbir şey gönderilmez; anahtarlar Anahtar Zinciri'nde kalır.
 
 ### Dosya karşılaştırma
 

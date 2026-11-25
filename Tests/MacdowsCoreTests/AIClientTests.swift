@@ -73,7 +73,7 @@ final class AIClientTests: XCTestCase {
         XCTAssertEqual((claudeBody["messages"] as! [[String: String]]).map { $0["role"] }, ["user"], "the system text is not a message for Claude")
         XCTAssertNotNil(claudeBody["max_tokens"])
 
-        let local = try AIClient(config: config("ollama", key: "")).chatRequest(messages, stream: true)
+        let local = try AIClient(config: config("custom", key: "")).chatRequest(messages, stream: true)
         XCTAssertNil(local.value(forHTTPHeaderField: "Authorization"), "no key, no header")
     }
 
@@ -88,7 +88,7 @@ final class AIClientTests: XCTestCase {
 
         """.utf8)
         var pieces: [String] = []
-        for try await piece in AIClient(config: config("ollama", key: ""), session: session()).stream([AIMessage(.user, "x")]) { pieces.append(piece) }
+        for try await piece in AIClient(config: config("custom", key: ""), session: session()).stream([AIMessage(.user, "x")]) { pieces.append(piece) }
         XCTAssertEqual(pieces, ["Mer", "haba"])
     }
 
@@ -104,32 +104,46 @@ final class AIClientTests: XCTestCase {
     }
 
     func testAServerThatIsNotRunningGetsAHelpfulMessage() async {
-        let config = AIConfig(providerID: "ollama", baseURL: "http://127.0.0.1:1/v1", model: "llama3.2", apiKey: "")
+        let config = AIConfig(providerID: "custom", baseURL: "http://127.0.0.1:1/v1", model: "m", apiKey: "")
         do {
             _ = try await AIClient(config: config).complete([AIMessage(.user, "x")])
             XCTFail("nothing listens there")
         } catch {
             XCTAssertTrue(error.localizedDescription.contains("Could not reach"), error.localizedDescription)
-            XCTAssertTrue(error.localizedDescription.contains("ollama serve"), "Ollama users are told how to start it")
+            XCTAssertTrue(error.localizedDescription.contains("Is the server running"), error.localizedDescription)
         }
     }
 
     func testModelsAreListedSorted() async throws {
         StubProtocol.status = 200
         StubProtocol.body = Data(#"{"data":[{"id":"zeta"},{"id":"alfa"}]}"#.utf8)
-        let models = try await AIClient(config: config("ollama", key: ""), session: session()).models()
+        let models = try await AIClient(config: config("custom", key: ""), session: session()).models()
         XCTAssertEqual(models, ["alfa", "zeta"])
+    }
+
+    func testTheFreeServicesAndGrokAreListedAndOllamaIsNot() {
+        let ids = AIProviders.all.map(\.id)
+        for wanted in ["gemini", "groq", "openrouter", "cerebras", "mistral", "github", "xai", "anthropic", "custom"] { XCTAssertTrue(ids.contains(wanted), wanted) }
+        XCTAssertFalse(ids.contains("ollama"))
+        XCTAssertEqual(AIProviders.all.first?.id, "gemini", "the first one is the default")
+        for provider in AIProviders.all where provider.id != "custom" {
+            XCTAssertNotNil(URL(string: provider.baseURL), provider.id)
+            XCTAssertTrue(provider.baseURL.hasPrefix("https://"), "\(provider.id) is reached over https")
+            XCTAssertFalse(provider.defaultModel.isEmpty, provider.id)
+            XCTAssertTrue(provider.needsKey, provider.id)
+        }
+        XCTAssertEqual(AIClient.delta(fromLine: #"data: {"choices":[{"delta":{"content":"x"}}]}"#, kind: AIProviders.provider(id: "xai").kind), "x", "Grok speaks the OpenAI format")
     }
 
     func testKeysStayOutOfDefaultsAndReadinessNeedsThem() {
         let suite = "ai-test-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
-        XCTAssertTrue(AIConfig(providerID: "ollama", baseURL: "http://localhost:11434/v1", model: "llama3.2", apiKey: "").isReady, "Ollama needs no key")
+        XCTAssertTrue(AIConfig(providerID: "custom", baseURL: "http://localhost:1234/v1", model: "m", apiKey: "").isReady, "a local server needs no key")
         XCTAssertFalse(AIConfig(providerID: "groq", baseURL: "x", model: "m", apiKey: "").isReady)
-        XCTAssertFalse(AIConfig(providerID: "ollama", baseURL: "x", model: "", apiKey: "").isReady, "a model must be named")
+        XCTAssertFalse(AIConfig(providerID: "custom", baseURL: "x", model: "", apiKey: "").isReady, "a model must be named")
         let store = AISettingsStore(defaults: defaults)
-        XCTAssertEqual(store.load().providerID, "ollama", "free and local is where it starts")
+        XCTAssertEqual(store.load().providerID, "gemini", "it starts on a service with a free tier")
         store.save(AIConfig(providerID: "custom", baseURL: "http://h:1/v1", model: "m", apiKey: ""))
         XCTAssertEqual(store.load().baseURL, "http://h:1/v1")
         XCTAssertFalse(defaults.dictionaryRepresentation().values.contains { ($0 as? String) == "secret-key" })

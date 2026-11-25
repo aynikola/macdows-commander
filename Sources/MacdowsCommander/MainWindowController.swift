@@ -2450,6 +2450,9 @@ extension RichEditorController {
 extension MainWindowController {
     @objc func previewPaneClicked(_ sender: Any?) { toggleSidePane(.preview) }
     @objc func aiClicked(_ sender: Any?) { toggleSidePane(.ai) }
+    @objc func aiSettingsClicked(_ sender: Any?) {
+        AISettingsForm.present(on: window) { [weak self] in self?.aiChat?.configChanged() }
+    }
 
     private func toggleSidePane(_ mode: SideMode) {
         if sideMode == mode {
@@ -2499,6 +2502,12 @@ extension MainWindowController {
             pane.setBody(chat)
             chat.refreshContext()
             window?.makeFirstResponder(chat.input)
+            // Nothing to talk to yet: the setup opens by itself, so it never has to be found.
+            if !AISettingsStore().load().isReady {
+                DispatchQueue.main.async { [weak self, weak chat] in
+                    AISettingsForm.present(on: self?.window) { chat?.configChanged() }
+                }
+            }
         }
         refreshSidePane(immediately: true)
     }

@@ -20,18 +20,24 @@ public struct AIProvider: Equatable, Identifiable {
 
 public enum AIProviders {
     public static let all: [AIProvider] = [
-        AIProvider(id: "ollama", name: "Ollama (free, on this Mac)", kind: .openAI, baseURL: "http://localhost:11434/v1", defaultModel: "llama3.2", needsKey: false,
-                   note: "Free and private: runs on this Mac. Install Ollama, then run: ollama pull llama3.2", keyPage: "https://ollama.com/download"),
+        AIProvider(id: "gemini", name: "Google Gemini (free tier)", kind: .openAI, baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", defaultModel: "gemini-2.5-flash", needsKey: true,
+                   note: "Free tier, no card needed. Get a key in Google AI Studio and paste it here.", keyPage: "https://aistudio.google.com/apikey"),
+        AIProvider(id: "groq", name: "Groq (free tier, very fast)", kind: .openAI, baseURL: "https://api.groq.com/openai/v1", defaultModel: "llama-3.3-70b-versatile", needsKey: true,
+                   note: "Free tier. Get a free key from the Groq console.", keyPage: "https://console.groq.com/keys"),
         AIProvider(id: "openrouter", name: "OpenRouter (free models)", kind: .openAI, baseURL: "https://openrouter.ai/api/v1", defaultModel: "meta-llama/llama-3.3-70b-instruct:free", needsKey: true,
-                   note: "Models ending in :free cost nothing. A free key is needed.", keyPage: "https://openrouter.ai/keys"),
-        AIProvider(id: "groq", name: "Groq (free tier)", kind: .openAI, baseURL: "https://api.groq.com/openai/v1", defaultModel: "llama-3.3-70b-versatile", needsKey: true,
-                   note: "Fast, with a free tier. A free key is needed.", keyPage: "https://console.groq.com/keys"),
-        AIProvider(id: "gemini", name: "Google Gemini (free tier)", kind: .openAI, baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", defaultModel: "gemini-2.0-flash", needsKey: true,
-                   note: "Has a free tier. A key from Google AI Studio is needed.", keyPage: "https://aistudio.google.com/apikey"),
+                   note: "Models whose name ends in :free cost nothing. Get a free key from OpenRouter.", keyPage: "https://openrouter.ai/keys"),
+        AIProvider(id: "cerebras", name: "Cerebras (free tier, very fast)", kind: .openAI, baseURL: "https://api.cerebras.ai/v1", defaultModel: "llama-3.3-70b", needsKey: true,
+                   note: "Free tier. Get a free key from Cerebras.", keyPage: "https://cloud.cerebras.ai"),
+        AIProvider(id: "mistral", name: "Mistral (free plan)", kind: .openAI, baseURL: "https://api.mistral.ai/v1", defaultModel: "mistral-small-latest", needsKey: true,
+                   note: "The free Experiment plan is enough. Get a key from the Mistral console.", keyPage: "https://console.mistral.ai/api-keys"),
+        AIProvider(id: "github", name: "GitHub Models (free with GitHub)", kind: .openAI, baseURL: "https://models.github.ai/inference", defaultModel: "openai/gpt-4o-mini", needsKey: true,
+                   note: "Free with a GitHub account. Create a token with the Models permission and paste it as the key.", keyPage: "https://github.com/settings/personal-access-tokens"),
+        AIProvider(id: "xai", name: "Grok (xAI)", kind: .openAI, baseURL: "https://api.x.ai/v1", defaultModel: "grok-3-mini", needsKey: true,
+                   note: "Paid by use, though xAI may give some starting credit. Get a key from the xAI console.", keyPage: "https://console.x.ai"),
         AIProvider(id: "anthropic", name: "Claude (Anthropic, paid)", kind: .anthropic, baseURL: "https://api.anthropic.com", defaultModel: "claude-sonnet-5-5", needsKey: true,
                    note: "Paid, by use. An API key is needed.", keyPage: "https://console.anthropic.com/settings/keys"),
         AIProvider(id: "custom", name: "Other (OpenAI compatible)", kind: .openAI, baseURL: "http://localhost:1234/v1", defaultModel: "", needsKey: false,
-                   note: "Any server with the OpenAI chat API, such as LM Studio. A key is optional.", keyPage: nil),
+                   note: "Any server with the OpenAI chat API, such as LM Studio or a company server. A key is optional.", keyPage: nil),
     ]
 
     public static func provider(id: String) -> AIProvider {
@@ -80,7 +86,7 @@ public final class AISettingsStore {
     }
 
     public func load() -> AIConfig {
-        let id = defaults.string(forKey: "ai.provider") ?? "ollama"
+        let id = defaults.string(forKey: "ai.provider") ?? "gemini"
         let provider = AIProviders.provider(id: id)
         return AIConfig(providerID: provider.id,
                         baseURL: defaults.string(forKey: "ai.baseURL.\(provider.id)") ?? provider.baseURL,
@@ -226,7 +232,7 @@ public final class AIClient {
         switch code {
         case NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost, NSURLErrorNetworkConnectionLost:
             let local = base.contains("localhost") || base.contains("127.0.0.1")
-            return AIError(local ? "Could not reach \(base). Is the server running? For Ollama, start the app or run: ollama serve" : "Could not reach \(base). Check the address and your connection.")
+            return AIError(local ? "Could not reach \(base). Is the server running?" : "Could not reach \(base). Check the address and your connection.")
         case NSURLErrorTimedOut:
             return AIError("The service did not answer in time.")
         case NSURLErrorNotConnectedToInternet:

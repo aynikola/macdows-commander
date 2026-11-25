@@ -451,7 +451,7 @@
 "ai.assistant" = "AI";
 "ai.context" = "Include %@";
 "ai.contextNone" = "No text file to include";
-"ai.notReady" = "Choose an AI service first: press the gear. Ollama is free and runs on this Mac.";
+"ai.notReady" = "Set up an AI service first: press Settings and paste a key. Google Gemini, Groq and OpenRouter have free keys.";
 "ai.hello" = "Ask about your files or have something written. Tick the box below to add the text file under the cursor to your question. Esc closes this pane.";
 "ai.empty" = "(The answer came back empty.)";
 "ai.provider" = "Service";
@@ -484,3 +484,5 @@
 "ai.write.working" = "AI is writing…";
 "ai.write.askTitle" = "What should the AI do?";
 "ai.write.askHint" = "For example: make this more formal";
+"ai.settingsShort" = "Settings";
+"menu.aiSettings" = "AI Settings…";

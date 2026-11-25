@@ -60,7 +60,7 @@ Pictures open at their real size. Crop, change the image or canvas size, rotate,
 
 ### AI help (F12, and in Write)
 
-Chat with an AI in the other panel, or let it help while you write: fix spelling, improve, shorten, translate, continue. Free choices: Ollama (runs on your Mac, no account) and the free tiers of OpenRouter, Groq and Google Gemini. Claude and any OpenAI-compatible server work too. Nothing is sent until you ask, and keys stay in the Keychain.
+Chat with an AI in the other panel, or let it help while you write: fix spelling, improve, shorten, translate, continue. Free choices: Google Gemini, Groq, Cerebras, Mistral, GitHub Models and OpenRouter's free models, each with a free key. Grok (xAI), Claude and any OpenAI-compatible server work too. Nothing is sent until you ask, and keys stay in the Keychain.
 
 ### Compare files
 

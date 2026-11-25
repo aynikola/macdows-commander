@@ -451,7 +451,7 @@
 "ai.assistant" = "Yapay zekâ";
 "ai.context" = "%@ dosyasını ekle";
 "ai.contextNone" = "Eklenecek metin dosyası yok";
-"ai.notReady" = "Önce bir yapay zekâ servisi seçin: ⚙ düğmesine basın. Ollama ücretsizdir ve bu Mac'te çalışır.";
+"ai.notReady" = "Önce bir yapay zekâ servisi ayarlayın: Ayarlar'a basıp bir anahtar yapıştırın. Google Gemini, Groq ve OpenRouter ücretsiz anahtar verir.";
 "ai.hello" = "Dosyalarınız hakkında soru sorun ya da bir şey yazdırın. Alttaki kutuyu işaretlerseniz imlecin üstündeki metin dosyası da soruya eklenir. Esc bu paneli kapatır.";
 "ai.empty" = "(Cevap boş geldi.)";
 "ai.provider" = "Servis";
@@ -484,3 +484,5 @@
 "ai.write.working" = "Yapay zekâ yazıyor…";
 "ai.write.askTitle" = "Yapay zekâdan ne istiyorsunuz?";
 "ai.write.askHint" = "Örnek: bunu daha resmi yaz";
+"ai.settingsShort" = "Ayarlar";
+"menu.aiSettings" = "Yapay Zekâ Ayarları…";

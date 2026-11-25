@@ -91,7 +91,7 @@ final class AISettingsForm: NSObject {
         note.stringValue = selected.note
         keyLink.isHidden = selected.keyPage == nil
         address.stringValue = config.baseURL
-        address.isEnabled = selected.id == "custom" || selected.id == "ollama"
+        address.isEnabled = selected.id == "custom"
         model.stringValue = config.model
         model.removeAllItems()
         key.stringValue = config.apiKey
@@ -220,7 +220,7 @@ final class AIChatView: NSView, NSTextFieldDelegate {
         sendButton.bezelStyle = .rounded
         sendButton.target = self
         sendButton.action = #selector(sendClicked)
-        settingsButton.title = "⚙"
+        settingsButton.title = "⚙ " + L10n.t("ai.settingsShort")
         settingsButton.toolTip = L10n.t("ai.settings")
         settingsButton.bezelStyle = .rounded
         settingsButton.target = self

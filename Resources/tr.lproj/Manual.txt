@@ -160,9 +160,14 @@ Başka sunucu üzerinden | Önce o sunucuyu kaydedin, sonra Şunun üzerinden al
 Parolayı boş bırakırsanız terminal sorar; tek kullanımlık kodlar için de bu uygundur.
 
 ## Yapay zekâ yardımı
-F12 diğer panelde bir yapay zekâyla sohbet açar. Servisi seçmek için ⚙ düğmesine basın:
-Ollama | Ücretsiz ve gizli: bu Mac'te çalışır. Ollama'yı kurun, "ollama pull llama3.2" çalıştırın; anahtar gerekmez
-OpenRouter, Groq, Gemini | Ücretsiz katmanları var; her biri kendi sitesinden ücretsiz bir anahtar ister (ayardaki bağlantı sayfayı açar)
+F12 diğer panelde bir yapay zekâyla sohbet açar.
+Servisi seçip anahtarını yapıştırmak için Ayarlar'a basın (Dosya > Yapay Zekâ Ayarları… ya da Write'ta AI > Yapay Zekâ Ayarları da olur); oradaki bağlantı anahtarın alındığı sayfayı açar:
+Google Gemini | Ücretsiz katman, kart gerekmez: Google AI Studio'dan anahtar
+Groq, Cerebras | Ücretsiz katman ve çok hızlı: sitelerinden ücretsiz anahtar
+OpenRouter | Adı :free ile biten modeller ücretsiz: ücretsiz anahtar
+Mistral | Ücretsiz Experiment planı: Mistral konsolundan anahtar
+GitHub Models | GitHub hesabıyla ücretsiz: Models izinli bir token anahtar olarak
+Grok (xAI) | Kullanıma göre ücretli, xAI konsolundan anahtar
 Claude | Kullanıma göre ücretli, API anahtarıyla
 Diğer | OpenAI sohbet arayüzü olan her sunucu, örneğin LM Studio
 Listele | Servise hangi modelleri sunduğunu sorar; model kutusuna elle de yazılabilir

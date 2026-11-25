@@ -100,6 +100,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         fileMenu.addItem(item(t("menu.newFile", []), #selector(MainWindowController.newFileClicked(_:)), String(UnicodeScalar(NSF7FunctionKey)!), .shift))
         fileMenu.addItem(item(t("menu.finder", []), #selector(MainWindowController.finderClicked(_:)), String(UnicodeScalar(NSF12FunctionKey)!), .shift))
         fileMenu.addItem(item(t("menu.ai", []), #selector(MainWindowController.aiClicked(_:)), String(UnicodeScalar(NSF12FunctionKey)!), []))
+        fileMenu.addItem(item(t("menu.aiSettings", []), #selector(MainWindowController.aiSettingsClicked(_:))))
         fileMenu.addItem(item(t("menu.previewPane", []), #selector(MainWindowController.previewPaneClicked(_:)), String(UnicodeScalar(NSF3FunctionKey)!), .option))
         fileMenu.addItem(item(t("menu.compare", []), #selector(MainWindowController.compareClicked(_:)), String(UnicodeScalar(NSF2FunctionKey)!), .option))
         fileMenu.addItem(item(t("menu.mirror", []), #selector(MainWindowController.mirrorClicked(_:)), String(UnicodeScalar(NSF2FunctionKey)!), []))
