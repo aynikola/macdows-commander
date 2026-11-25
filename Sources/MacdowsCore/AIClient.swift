@@ -20,7 +20,7 @@ public struct AIProvider: Equatable, Identifiable {
 
 public enum AIProviders {
     public static let all: [AIProvider] = [
-        AIProvider(id: "gemini", name: "Google Gemini (free tier)", kind: .openAI, baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", defaultModel: "gemini-2.5-flash-lite", needsKey: true,
+        AIProvider(id: "gemini", name: "Google Gemini (free tier)", kind: .openAI, baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", defaultModel: "gemini-3.5-flash-lite", needsKey: true,
                    note: "Free tier, no card needed. Get a key in Google AI Studio and paste it here.", keyPage: "https://aistudio.google.com/apikey"),
         AIProvider(id: "groq", name: "Groq (free tier, very fast)", kind: .openAI, baseURL: "https://api.groq.com/openai/v1", defaultModel: "llama-3.3-70b-versatile", needsKey: true,
                    note: "Free tier. Get a free key from the Groq console.", keyPage: "https://console.groq.com/keys"),
@@ -236,6 +236,7 @@ public final class AIClient {
         var text = "\(short) (\(status))"
         if status == 429 { text += "\nThe limit for this model is used up, or the free tier does not include it for your key. Try another model (Settings, Load list) or another service." }
         if status == 401 || status == 403 { text += "\nCheck the key in Settings." }
+        if status == 404 { text += "\nThe model may have been retired. Pick a current one in Settings with Load list." }
         return text
     }
 

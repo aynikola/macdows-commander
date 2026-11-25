@@ -121,6 +121,7 @@ final class AIClientTests: XCTestCase {
         XCTAssertFalse(text.contains("metric"), "only the first line of the service's message")
         XCTAssertTrue(text.contains("Try another model"))
         XCTAssertTrue(AIClient.errorMessage(status: 401, body: Data(#"{"error":{"message":"bad key"}}"#.utf8)).contains("Check the key"))
+        XCTAssertTrue(AIClient.errorMessage(status: 404, body: Data(#"[{"error":{"message":"This model is no longer available."}}]"#.utf8)).contains("Load list"), "a retired model points to the list")
     }
 
     func testModelsAreListedSorted() async throws {
