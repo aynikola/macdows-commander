@@ -99,7 +99,7 @@ final class AIClientTests: XCTestCase {
             _ = try await AIClient(config: config("groq"), session: session()).complete([AIMessage(.user, "x")])
             XCTFail("should fail")
         } catch {
-            XCTAssertEqual(error.localizedDescription, "Invalid API key (401)")
+            XCTAssertTrue(error.localizedDescription.hasPrefix("Invalid API key (401)"), error.localizedDescription)
         }
     }
 
@@ -112,6 +112,15 @@ final class AIClientTests: XCTestCase {
             XCTAssertTrue(error.localizedDescription.contains("Could not reach"), error.localizedDescription)
             XCTAssertTrue(error.localizedDescription.contains("Is the server running"), error.localizedDescription)
         }
+    }
+
+    func testGeminiStyleErrorListsAreReadAndQuotaGetsAdvice() {
+        let body = Data(#"[{"error":{"code":429,"message":"You exceeded your current quota, please check your plan.\n* Quota exceeded for metric: x, limit: 0\nPlease retry in 3s."}}]"#.utf8)
+        let text = AIClient.errorMessage(status: 429, body: body)
+        XCTAssertTrue(text.hasPrefix("You exceeded your current quota, please check your plan. (429)"), text)
+        XCTAssertFalse(text.contains("metric"), "only the first line of the service's message")
+        XCTAssertTrue(text.contains("Try another model"))
+        XCTAssertTrue(AIClient.errorMessage(status: 401, body: Data(#"{"error":{"message":"bad key"}}"#.utf8)).contains("Check the key"))
     }
 
     func testModelsAreListedSorted() async throws {

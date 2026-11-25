@@ -20,7 +20,7 @@ public struct AIProvider: Equatable, Identifiable {
 
 public enum AIProviders {
     public static let all: [AIProvider] = [
-        AIProvider(id: "gemini", name: "Google Gemini (free tier)", kind: .openAI, baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", defaultModel: "gemini-2.5-flash", needsKey: true,
+        AIProvider(id: "gemini", name: "Google Gemini (free tier)", kind: .openAI, baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", defaultModel: "gemini-2.5-flash-lite", needsKey: true,
                    note: "Free tier, no card needed. Get a key in Google AI Studio and paste it here.", keyPage: "https://aistudio.google.com/apikey"),
         AIProvider(id: "groq", name: "Groq (free tier, very fast)", kind: .openAI, baseURL: "https://api.groq.com/openai/v1", defaultModel: "llama-3.3-70b-versatile", needsKey: true,
                    note: "Free tier. Get a free key from the Groq console.", keyPage: "https://console.groq.com/keys"),
@@ -217,13 +217,26 @@ public final class AIClient {
 
     /// The message a service gives for an error, in its own words when it sent one.
     static func errorMessage(status: Int, body: Data) -> String {
-        if let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any] {
-            if let error = json["error"] as? [String: Any], let message = error["message"] as? String { return "\(message) (\(status))" }
-            if let error = json["error"] as? String { return "\(error) (\(status))" }
-            if let message = json["message"] as? String { return "\(message) (\(status))" }
+        let parsed = try? JSONSerialization.jsonObject(with: body)
+        // Gemini wraps its error in a list, the others send the object itself.
+        let json = (parsed as? [String: Any]) ?? (parsed as? [[String: Any]])?.first
+        var message: String?
+        if let json {
+            if let error = json["error"] as? [String: Any] { message = error["message"] as? String }
+            else if let error = json["error"] as? String { message = error }
+            else { message = json["message"] as? String }
         }
-        let text = String(decoding: body.prefix(300), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? "The service answered with error \(status)." : "\(text) (\(status))"
+        if message == nil {
+            let text = String(decoding: body.prefix(300), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+            message = text.isEmpty ? "The service answered with error \(status)." : text
+        }
+        // The first line says it; the rest is usually links and a table of limits.
+        var short = message?.components(separatedBy: "\n").first ?? ""
+        if short.count > 240 { short = String(short.prefix(240)) + "…" }
+        var text = "\(short) (\(status))"
+        if status == 429 { text += "\nThe limit for this model is used up, or the free tier does not include it for your key. Try another model (Settings, Load list) or another service." }
+        if status == 401 || status == 403 { text += "\nCheck the key in Settings." }
+        return text
     }
 
     private func friendly(_ error: Error) -> Error {
