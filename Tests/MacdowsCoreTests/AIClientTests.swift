@@ -6,6 +6,8 @@ private final class StubProtocol: URLProtocol {
     nonisolated(unsafe) static var status = 200
     nonisolated(unsafe) static var body = Data()
     nonisolated(unsafe) static var lastRequest: URLRequest?
+    /// Requests for these models answer 404.
+    nonisolated(unsafe) static var failing = Set<String>()
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -23,7 +25,9 @@ private final class StubProtocol: URLProtocol {
             seen.httpBody = data
         }
         Self.lastRequest = seen
-        let response = HTTPURLResponse(url: request.url!, statusCode: Self.status, httpVersion: nil, headerFields: ["Content-Type": "text/event-stream"])!
+        var status = Self.status
+        if let body = seen.httpBody, let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any], let model = json["model"] as? String, Self.failing.contains(model) { status = 404 }
+        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: ["Content-Type": "text/event-stream"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Self.body)
         client?.urlProtocolDidFinishLoading(self)
@@ -124,15 +128,59 @@ final class AIClientTests: XCTestCase {
         XCTAssertTrue(AIClient.errorMessage(status: 404, body: Data(#"[{"error":{"message":"This model is no longer available."}}]"#.utf8)).contains("Load list"), "a retired model points to the list")
     }
 
-    func testModelChoicesPutTheCurrentOneFirstWithoutRepeats() {
+    func testModelChoicesPutTheCurrentOneFirstAndPreferWhatWasTried() {
         let config = AIConfig(providerID: "gemini", baseURL: "x", model: "gemini-2.0-flash", apiKey: "k")
-        let choices = AIProviders.choices(for: config, fetched: ["gemini-9", "gemini-2.0-flash"])
-        XCTAssertEqual(choices.first, "gemini-2.0-flash")
-        XCTAssertEqual(choices[1], "gemini-9", "the fetched list comes before the suggestions")
-        XCTAssertEqual(choices.count, Set(choices).count, "no name twice")
-        XCTAssertTrue(choices.contains("gemini-3.5-flash-lite"))
+        let fetched = AIProviders.choices(for: config, fetched: ["gemini-9-flash", "gemini-2.0-flash", "antigravity-preview-latest"])
+        XCTAssertEqual(fetched, ["gemini-2.0-flash", "gemini-9-flash"], "the service's list, cleaned, with the current one first and no repeats")
+        let suggested = AIProviders.choices(for: config, fetched: [])
+        XCTAssertTrue(suggested.contains("gemini-3.5-flash-lite"), "without a fetched list the suggestions stand in")
+        XCTAssertEqual(AIProviders.choices(for: config, fetched: ["gemini-9-flash"], working: ["gemini-3.5-flash"]), ["gemini-2.0-flash", "gemini-3.5-flash"], "what answered wins over everything else")
         for provider in AIProviders.all where provider.id != "custom" { XCTAssertFalse(provider.suggestedModels.isEmpty, provider.id) }
         XCTAssertTrue(AIProviders.provider(id: "gemini").suggestedModels.contains(AIProviders.provider(id: "gemini").defaultModel), "the default is one of the suggestions")
+    }
+
+    func testGoogleListsKeepOnlyTheChatModels() {
+        let listed = ["antigravity-preview-latest", "deep-research-preview-04-2026", "gemini-2.5-computer-use-preview-10-2025", "gemini-2.5-flash", "gemini-2.5-flash-lite",
+                      "gemini-3-flash-preview", "gemini-3.1-flash-live-preview", "gemini-3.1-pro-preview", "gemini-3.1-pro-preview-customtools", "gemini-3.5-flash-lite",
+                      "gemini-3.8-live", "gemini-4-argon", "gemini-decision-1", "gemini-flash-latest", "gemini-nano-banana-2.1", "gemini-omni-1.1-flash",
+                      "gemini-robotics-er-2-preview", "gemma-4-31b-it", "genie-4", "lyria-3.5", "models/gemini-pro-latest", "models/text-embedding-004"]
+        XCTAssertEqual(AIClient.chatModels(listed, provider: "gemini"),
+                       ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3-flash-preview", "gemini-3.1-pro-preview", "gemini-3.5-flash-lite", "gemini-flash-latest", "gemini-pro-latest", "gemma-4-31b-it"])
+        XCTAssertEqual(AIClient.chatModels(["a:free", "b", "c:free"], provider: "openrouter"), ["a:free", "c:free"], "OpenRouter shows only the free ones")
+    }
+
+    func testOnlyModelsThatAnswerAreKept() async {
+        StubProtocol.status = 200
+        StubProtocol.body = Data("{}".utf8)
+        StubProtocol.failing = ["retired", "nokta"]
+        defer { StubProtocol.failing = [] }
+        let config = AIConfig(providerID: "custom", baseURL: "http://h/v1", model: "x", apiKey: "")
+        let working = await AIClient.working(among: ["good-1", "retired", "good-2", "nokta", "good-3", "good-4", "good-5"], config: config, session: session())
+        XCTAssertEqual(working, ["good-1", "good-2", "good-3", "good-4", "good-5"], "in the order given, the failing ones left out")
+        let none = await AIClient.working(among: ["retired"], config: config, session: session())
+        XCTAssertEqual(none, [])
+        let progress = ProgressCounter()
+        _ = await AIClient.working(among: ["a", "b", "c"], config: config, session: session()) { done, total in progress.add(done, total) }
+        XCTAssertEqual(progress.last?.1, 3)
+        XCTAssertEqual(progress.last?.0, 3)
+    }
+
+    func testTheReplacementForADeadModelIsALiteOneIfThereIsOne() {
+        XCTAssertEqual(AIProviders.preferred(from: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"]), "gemini-2.5-flash-lite")
+        XCTAssertEqual(AIProviders.preferred(from: ["gemini-2.5-pro", "gemini-2.5-flash"]), "gemini-2.5-flash")
+        XCTAssertEqual(AIProviders.preferred(from: ["big-model"]), "big-model")
+        XCTAssertNil(AIProviders.preferred(from: []))
+    }
+
+    func testWorkingModelsAreRemembered() {
+        let suite = "ai-working-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = AISettingsStore(defaults: defaults)
+        XCTAssertEqual(store.workingModels(for: "gemini"), [])
+        store.setWorkingModels(["m1"], for: "gemini")
+        XCTAssertEqual(store.workingModels(for: "gemini"), ["m1"])
+        XCTAssertEqual(store.workingModels(for: "groq"), [])
     }
 
     func testFetchedListsDropModelsThatCannotChatAndTheModelsPrefix() {
@@ -185,4 +233,11 @@ final class AIClientTests: XCTestCase {
         XCTAssertEqual(store.load().baseURL, "http://h:1/v1")
         XCTAssertFalse(defaults.dictionaryRepresentation().values.contains { ($0 as? String) == "secret-key" })
     }
+}
+
+private final class ProgressCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [(Int, Int)] = []
+    func add(_ done: Int, _ total: Int) { lock.lock(); values.append((done, total)); lock.unlock() }
+    var last: (Int, Int)? { lock.lock(); defer { lock.unlock() }; return values.max { $0.0 < $1.0 } }
 }

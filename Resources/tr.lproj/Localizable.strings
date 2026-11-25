@@ -486,3 +486,7 @@
 "ai.write.askHint" = "Örnek: bunu daha resmi yaz";
 "ai.settingsShort" = "Ayarlar";
 "menu.aiSettings" = "Yapay Zekâ Ayarları…";
+"ai.findWorking" = "Çalışan modelleri bul";
+"ai.checking" = "Modeller deneniyor… %@ / %@";
+"ai.someWork" = "%@ / %@ model çalışıyor. Listede yalnızca onlar var.";
+"ai.noneWork" = "Hiçbir model cevap vermedi. Anahtarı kontrol edin ya da ücretsiz limit dolmuş olabilir.";

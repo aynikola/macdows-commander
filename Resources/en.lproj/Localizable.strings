@@ -486,3 +486,7 @@
 "ai.write.askHint" = "For example: make this more formal";
 "ai.settingsShort" = "Settings";
 "menu.aiSettings" = "AI Settings…";
+"ai.findWorking" = "Check which models work";
+"ai.checking" = "Trying models… %@ of %@";
+"ai.someWork" = "%@ of %@ models work. The list shows only those.";
+"ai.noneWork" = "No model answered. Check the key, or the free limit may be used up.";

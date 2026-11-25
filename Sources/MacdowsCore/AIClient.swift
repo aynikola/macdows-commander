@@ -43,9 +43,18 @@ public enum AIProviders {
     ]
 
     /// What the model box offers: the one in use, then the service's own list if it was fetched, then the suggestions.
-    public static func choices(for config: AIConfig, fetched: [String]) -> [String] {
+    /// Models that were tried and answered come first and alone; failing that the service's own list, cleaned up;
+    /// failing that the suggestions. The one in use is always shown so the menu never disagrees with the settings.
+    public static func choices(for config: AIConfig, fetched: [String], working: [String] = []) -> [String] {
+        let listed = AIClient.chatModels(fetched, provider: config.providerID)
+        let base = !working.isEmpty ? working : (!listed.isEmpty ? listed : config.provider.suggestedModels)
         var seen = Set<String>()
-        return ([config.model] + fetched + config.provider.suggestedModels).filter { !$0.isEmpty && seen.insert($0).inserted }
+        return ([config.model] + base).filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+
+    /// Which working model to switch to when the one in use does not answer: a lite one first, they have the widest free limits.
+    public static func preferred(from working: [String]) -> String? {
+        working.first { $0.contains("lite") } ?? working.first { $0.contains("flash") || $0.contains("-mini") || $0.contains("-small") || $0.contains("instant") } ?? working.first
     }
 
     public static func provider(id: String) -> AIProvider {
@@ -118,6 +127,15 @@ public final class AISettingsStore {
         defaults.set(models, forKey: "ai.models.\(providerID)")
     }
 
+    /// The models that answered the last time they were tried.
+    public func workingModels(for providerID: String) -> [String] {
+        defaults.stringArray(forKey: "ai.working.\(providerID)") ?? []
+    }
+
+    public func setWorkingModels(_ models: [String], for providerID: String) {
+        defaults.set(models, forKey: "ai.working.\(providerID)")
+    }
+
     /// The config a service would start with, as if it was just picked.
     public func config(for providerID: String) -> AIConfig {
         let provider = AIProviders.provider(id: providerID)
@@ -173,7 +191,7 @@ public final class AIClient {
 
     // MARK: Requests
 
-    func chatRequest(_ messages: [AIMessage], stream: Bool) throws -> URLRequest {
+    func chatRequest(_ messages: [AIMessage], stream: Bool, maxTokens: Int? = nil) throws -> URLRequest {
         let kind = config.provider.kind
         let path = kind == .anthropic ? "/v1/messages" : "/chat/completions"
         guard let url = URL(string: base + path), url.scheme != nil else { throw AIError("The address is not valid: \(config.baseURL)") }
@@ -186,13 +204,14 @@ public final class AIClient {
         case .openAI:
             if !config.apiKey.isEmpty { request.setValue("Bearer \(config.apiKey)", forHTTPHeaderField: "Authorization") }
             body["messages"] = messages.map { ["role": $0.role.rawValue, "content": $0.content] }
+            if let maxTokens { body["max_tokens"] = maxTokens }
         case .anthropic:
             request.setValue(config.apiKey, forHTTPHeaderField: "x-api-key")
             request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
             let system = messages.filter { $0.role == .system }.map(\.content).joined(separator: "\n\n")
             if !system.isEmpty { body["system"] = system }
             body["messages"] = messages.filter { $0.role != .system }.map { ["role": $0.role.rawValue, "content": $0.content] }
-            body["max_tokens"] = 4096
+            body["max_tokens"] = maxTokens ?? 4096
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         return request
@@ -308,10 +327,22 @@ public final class AIClient {
     }
 
     /// Only models that can chat, named the way a request wants them: Gemini lists "models/gemini-…" but takes "gemini-…".
-    static func chatModels(_ ids: [String]) -> [String] {
-        let skip = ["embed", "tts", "whisper", "imagen", "veo", "guard", "moderation", "aqa", "transcribe", "dall-e", "image", "audio"]
-        let names = ids.map { $0.hasPrefix("models/") ? String($0.dropFirst(7)) : $0 }
-        return Array(Set(names.filter { name in !skip.contains { name.lowercased().contains($0) } })).sorted()
+    public static func chatModels(_ ids: [String], provider: String = "") -> [String] {
+        let skip = ["embed", "tts", "whisper", "imagen", "veo", "guard", "moderation", "aqa", "transcribe", "dall-e", "image", "audio",
+                    "live", "lyria", "robotics", "deep-research", "computer-use", "omni", "nano-banana", "genie", "antigravity", "customtools"]
+        var names = ids.map { $0.hasPrefix("models/") ? String($0.dropFirst(7)) : $0 }
+        names = names.filter { name in !skip.contains { name.lowercased().contains($0) } }
+        switch provider {
+        case "gemini":
+            // Google lists music, robotics, voice and test models next to the chat ones: only gemini-N-flash/pro, the -latest names and Gemma stay.
+            let chat = #"^(gemini-\d+(\.\d+)?-(flash|pro)(-lite)?(-preview)?|gemini-(flash|pro)(-lite)?-latest|gemma-[\w.-]+-it)$"#
+            names = names.filter { $0.range(of: chat, options: .regularExpression) != nil }
+        case "openrouter":
+            names = names.filter { $0.hasSuffix(":free") }
+        default:
+            break
+        }
+        return Array(Set(names)).sorted()
     }
 
     /// The models the service offers, for the settings list.
@@ -323,9 +354,48 @@ public final class AIClient {
             }
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
             let list = (json?["data"] as? [[String: Any]])?.compactMap { $0["id"] as? String } ?? []
-            return Self.chatModels(list)
+            return Self.chatModels(list, provider: config.providerID)
         } catch {
             throw friendly(error)
         }
+    }
+
+    // MARK: Trying models
+
+    /// True when the service answers a tiny request with this model, so quota and retired names show up before they get in the way.
+    public func answers() async -> Bool {
+        do {
+            var request = try chatRequest([AIMessage(.user, "Reply with OK")], stream: false, maxTokens: 16)
+            request.timeoutInterval = 25
+            let (_, response) = try await session.data(for: request)
+            return (response as? HTTPURLResponse)?.statusCode == 200
+        } catch {
+            return false
+        }
+    }
+
+    /// The models among `candidates` that answer, in the order given. Four are tried at a time.
+    public static func working(among candidates: [String], config: AIConfig, session: URLSession = .shared, limit: Int = 24, progress: (@Sendable (Int, Int) -> Void)? = nil) async -> [String] {
+        let tried = Array(candidates.prefix(limit))
+        var works: [String: Bool] = [:]
+        var done = 0
+        var index = 0
+        while index < tried.count {
+            let batch = Array(tried[index..<min(index + 4, tried.count)])
+            index += batch.count
+            await withTaskGroup(of: (String, Bool).self) { group in
+                for model in batch {
+                    var copy = config
+                    copy.model = model
+                    group.addTask { (model, await AIClient(config: copy, session: session).answers()) }
+                }
+                for await (model, ok) in group {
+                    works[model] = ok
+                    done += 1
+                    progress?(done, tried.count)
+                }
+            }
+        }
+        return tried.filter { works[$0] == true }
     }
 }

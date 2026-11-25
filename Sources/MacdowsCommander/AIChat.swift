@@ -13,6 +13,7 @@ final class AISettingsForm: NSObject {
     private let status = NSTextField(wrappingLabelWithString: "")
     private let loadButton = NSButton(title: "", target: nil, action: nil)
     private let testButton = NSButton(title: "", target: nil, action: nil)
+    private let findButton = NSButton(title: "", target: nil, action: nil)
     private var work: Task<Void, Never>?
     let view = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 270))
 
@@ -40,7 +41,10 @@ final class AISettingsForm: NSObject {
         testButton.title = L10n.t("ai.test")
         testButton.target = self
         testButton.action = #selector(runTest)
-        for button in [loadButton, testButton] { button.bezelStyle = .rounded; button.controlSize = .small }
+        findButton.title = L10n.t("ai.findWorking")
+        findButton.target = self
+        findButton.action = #selector(findWorking)
+        for button in [loadButton, testButton, findButton] { button.bezelStyle = .rounded; button.controlSize = .small }
         status.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         status.maximumNumberOfLines = 3
 
@@ -66,6 +70,7 @@ final class AISettingsForm: NSObject {
             row([NSView(), keyLink]),
             row([label("ai.address"), address]),
             row([label("ai.model"), model, loadButton]),
+            row([NSView(), findButton]),
             row([label("ai.key"), key]),
             row([NSView(), testButton, status]),
         ])
@@ -93,7 +98,7 @@ final class AISettingsForm: NSObject {
         address.stringValue = config.baseURL
         address.isEnabled = selected.id == "custom"
         model.removeAllItems()
-        model.addItems(withObjectValues: AIProviders.choices(for: config, fetched: store.fetchedModels(for: selected.id)))
+        model.addItems(withObjectValues: AIProviders.choices(for: config, fetched: store.fetchedModels(for: selected.id), working: store.workingModels(for: selected.id)))
         model.stringValue = config.model
         key.stringValue = config.apiKey
         key.placeholderString = selected.needsKey ? L10n.t("ai.keyNeeded") : L10n.t("ai.keyOptional")
@@ -133,12 +138,43 @@ final class AISettingsForm: NSObject {
                 self.store.setFetchedModels(names, for: current.providerID)
                 let typed = self.model.stringValue
                 self.model.removeAllItems()
-                self.model.addItems(withObjectValues: AIProviders.choices(for: current, fetched: names))
+                self.model.addItems(withObjectValues: AIProviders.choices(for: current, fetched: names, working: self.store.workingModels(for: current.providerID)))
                 self.model.stringValue = typed.isEmpty ? (names.first ?? "") : typed
                 self.show(L10n.t("ai.modelsLoaded", String(names.count)))
             } catch {
                 if !silent, !(error is CancellationError) { self?.show(error.localizedDescription, isError: true) }
             }
+        }
+    }
+
+    /// Tries each model with a tiny request and keeps those that answer: quota and retired names are found here, not in the middle of a chat.
+    @objc private func findWorking() {
+        let current = config
+        guard current.isReady else {
+            show(L10n.t(current.model.isEmpty && !current.provider.needsKey ? "ai.needModel" : "ai.needKey"), isError: true)
+            return
+        }
+        show(L10n.t("ai.testing"))
+        findButton.isEnabled = false
+        work?.cancel()
+        work = Task { @MainActor [weak self] in
+            // The service's own list is the best list of candidates; its suggestions stand in when that cannot be fetched.
+            var candidates = (try? await AIClient(config: current).models()) ?? []
+            if candidates.isEmpty { candidates = AIClient.chatModels(current.provider.suggestedModels, provider: current.providerID) }
+            if candidates.isEmpty, !current.model.isEmpty { candidates = [current.model] }
+            let found = await AIClient.working(among: candidates, config: current) { done, total in
+                DispatchQueue.main.async { self?.show(L10n.t("ai.checking", String(done), String(total))) }
+            }
+            guard let self, !Task.isCancelled, self.chosen.id == current.providerID else { return }
+            self.findButton.isEnabled = true
+            self.store.setFetchedModels(candidates, for: current.providerID)
+            self.store.setWorkingModels(found, for: current.providerID)
+            let typed = self.model.stringValue
+            self.model.removeAllItems()
+            self.model.addItems(withObjectValues: AIProviders.choices(for: current, fetched: candidates, working: found))
+            // A model that does not answer is replaced by the first one that does.
+            self.model.stringValue = found.contains(typed) || found.isEmpty ? typed : found[0]
+            self.show(found.isEmpty ? L10n.t("ai.noneWork") : L10n.t("ai.someWork", String(found.count), String(candidates.count)), isError: found.isEmpty)
         }
     }
 
@@ -341,7 +377,7 @@ final class AIChatView: NSView, NSTextFieldDelegate {
     /// The models to switch between: the one in use, the service's own list, and the suggestions.
     private func refreshModels() {
         let config = store.load()
-        let choices = AIProviders.choices(for: config, fetched: store.fetchedModels(for: config.providerID))
+        let choices = AIProviders.choices(for: config, fetched: store.fetchedModels(for: config.providerID), working: store.workingModels(for: config.providerID))
         if modelPopup.itemTitles != choices {
             modelPopup.removeAllItems()
             modelPopup.addItems(withTitles: choices)
@@ -353,7 +389,21 @@ final class AIChatView: NSView, NSTextFieldDelegate {
         Task { @MainActor [weak self] in
             guard let names = try? await AIClient(config: config).models(), !names.isEmpty else { return }
             self?.store.setFetchedModels(names, for: config.providerID)
+            // The first time, each model gets a tiny request, so the menu holds only models that answer; a model that
+            // does not (retired, or out of free quota) is replaced by one that does.
+            if self?.store.workingModels(for: config.providerID).isEmpty == true {
+                let found = await AIClient.working(among: names, config: config)
+                if !found.isEmpty, let self {
+                    self.store.setWorkingModels(found, for: config.providerID)
+                    if !found.contains(config.model), let better = AIProviders.preferred(from: found) {
+                        var changed = self.store.load()
+                        changed.model = better
+                        self.store.save(changed)
+                    }
+                }
+            }
             self?.refreshModels()
+            if let summary = self?.summary { self?.onConfigChange?(summary) }
         }
     }
 
