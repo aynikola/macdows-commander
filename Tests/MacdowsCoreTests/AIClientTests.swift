@@ -139,6 +139,17 @@ final class AIClientTests: XCTestCase {
         XCTAssertTrue(AIProviders.provider(id: "gemini").suggestedModels.contains(AIProviders.provider(id: "gemini").defaultModel), "the default is one of the suggestions")
     }
 
+    func testOnlyFourModelsAreOfferedBestFirst() {
+        let many = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3-flash-preview", "gemini-pro-latest", "gemini-3.1-pro-preview", "gemma-4-31b-it"]
+        XCTAssertEqual(AIProviders.top(many), ["gemini-3.5-flash-lite", "gemini-2.5-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash"], "lite and newer first, previews and -latest last")
+        let config = AIConfig(providerID: "gemini", baseURL: "x", model: "gemini-2.5-pro", apiKey: "k")
+        let choices = AIProviders.choices(for: config, fetched: many)
+        XCTAssertEqual(choices.count, 4)
+        XCTAssertEqual(choices.first, "gemini-2.5-pro", "the one in use stays on top even when it is not among the best")
+        XCTAssertEqual(AIProviders.choices(for: config, fetched: [], working: Array(repeating: "x", count: 1) + many).count, 4, "a long working list is cut too")
+        XCTAssertLessThanOrEqual(AIProviders.choices(for: config, fetched: []).count, 4, "so are the suggestions")
+    }
+
     func testGoogleListsKeepOnlyTheChatModels() {
         let listed = ["antigravity-preview-latest", "deep-research-preview-04-2026", "gemini-2.5-computer-use-preview-10-2025", "gemini-2.5-flash", "gemini-2.5-flash-lite",
                       "gemini-3-flash-preview", "gemini-3.1-flash-live-preview", "gemini-3.1-pro-preview", "gemini-3.1-pro-preview-customtools", "gemini-3.5-flash-lite",

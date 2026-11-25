@@ -162,9 +162,9 @@ final class AISettingsForm: NSObject {
             var candidates = (try? await AIClient(config: current).models()) ?? []
             if candidates.isEmpty { candidates = AIClient.chatModels(current.provider.suggestedModels, provider: current.providerID) }
             if candidates.isEmpty, !current.model.isEmpty { candidates = [current.model] }
-            let found = await AIClient.working(among: candidates, config: current) { done, total in
+            let found = Array(await AIClient.working(among: AIProviders.top(candidates, count: 8), config: current) { done, total in
                 DispatchQueue.main.async { self?.show(L10n.t("ai.checking", String(done), String(total))) }
-            }
+            }.prefix(AIProviders.maxChoices))
             guard let self, !Task.isCancelled, self.chosen.id == current.providerID else { return }
             self.findButton.isEnabled = true
             self.store.setFetchedModels(candidates, for: current.providerID)
@@ -392,7 +392,8 @@ final class AIChatView: NSView, NSTextFieldDelegate {
             // The first time, each model gets a tiny request, so the menu holds only models that answer; a model that
             // does not (retired, or out of free quota) is replaced by one that does.
             if self?.store.workingModels(for: config.providerID).isEmpty == true {
-                let found = await AIClient.working(among: names, config: config)
+                // Only the best few are tried, so a first run costs a handful of tiny requests.
+                let found = Array(await AIClient.working(among: AIProviders.top(names, count: 8), config: config).prefix(AIProviders.maxChoices))
                 if !found.isEmpty, let self {
                     self.store.setWorkingModels(found, for: config.providerID)
                     if !found.contains(config.model), let better = AIProviders.preferred(from: found) {

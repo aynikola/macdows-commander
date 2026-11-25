@@ -170,7 +170,7 @@ GitHub Models | Free with a GitHub account: a token with the Models permission a
 Grok (xAI) | Paid by use, with a key from the xAI console
 Claude | Paid by use, with an API key
 Other | Any server with the OpenAI chat API, such as LM Studio
-Models | The box under the chat switches the model at once. The first time, the app fetches the service's own list and tries each model with a tiny request, so the menu holds only models that answer; a model that does not (retired, or out of free limit) is replaced by one that does. "Check which models work" in Settings does it again
+Models | The box under the chat switches the model at once. The first time, the app fetches the service's own list and tries each model with a tiny request, so the menu holds the best four that answer; a model that does not (retired, or out of free limit) is replaced by one that does. "Check which models work" in Settings does it again
 Nothing is sent until you press Enter. The box under the chat adds the text file under the cursor to your question. The title bar shows which service and model get the text. Keys are kept in the Keychain.
 In Write (F10) the AI menu fixes spelling, improves, shortens, lengthens, translates, summarizes, continues the text or does what you ask. It works on the selected text, or on the paragraph the cursor is in; ⌘Z undoes it.
 

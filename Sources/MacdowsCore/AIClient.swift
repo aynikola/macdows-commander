@@ -47,9 +47,36 @@ public enum AIProviders {
     /// failing that the suggestions. The one in use is always shown so the menu never disagrees with the settings.
     public static func choices(for config: AIConfig, fetched: [String], working: [String] = []) -> [String] {
         let listed = AIClient.chatModels(fetched, provider: config.providerID)
-        let base = !working.isEmpty ? working : (!listed.isEmpty ? listed : config.provider.suggestedModels)
+        let base = !working.isEmpty ? working : (!listed.isEmpty ? top(listed) : config.provider.suggestedModels)
         var seen = Set<String>()
-        return ([config.model] + base).filter { !$0.isEmpty && seen.insert($0).inserted }
+        // Four at most: a menu of dozens only hides the ones that work.
+        return Array(([config.model] + base).filter { !$0.isEmpty && seen.insert($0).inserted }.prefix(maxChoices))
+    }
+
+    public static let maxChoices = 4
+
+    /// Best first: lite models (widest free limits), then flash and mini ones, then the rest; newer before older, and previews
+    /// and -latest names after the stable ones.
+    public static func ranked(_ models: [String]) -> [String] {
+        func version(_ name: String) -> Double {
+            guard let range = name.range(of: #"\d+(\.\d+)?"#, options: .regularExpression) else { return 0 }
+            return Double(name[range]) ?? 0
+        }
+        func score(_ name: String) -> Int {
+            let lower = name.lowercased()
+            let size = lower.contains("lite") ? 0 : (lower.contains("flash") || lower.contains("-mini") || lower.contains("-small") || lower.contains("instant") || lower.contains("8b") ? 1 : 2)
+            return size + (lower.contains("preview") || lower.contains("latest") || lower.contains("exp") ? 3 : 0)
+        }
+        return models.sorted { a, b in
+            let (sa, sb) = (score(a), score(b))
+            if sa != sb { return sa < sb }
+            let (va, vb) = (version(a), version(b))
+            return va != vb ? va > vb : a < b
+        }
+    }
+
+    public static func top(_ models: [String], count: Int = maxChoices) -> [String] {
+        Array(ranked(models).prefix(count))
     }
 
     /// Which working model to switch to when the one in use does not answer: a lite one first, they have the widest free limits.
